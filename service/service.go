@@ -33,8 +33,7 @@ type ObserverAPIStore struct {
 }
 
 // Run the service with its dependencies
-func Run(buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
-	ctx := context.Background()
+func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
 	log.Event(ctx, "running service", log.INFO)
 
 	cfg, err := config.Get()
@@ -68,7 +67,7 @@ func Run(buildTime, gitCommit, version string, svcErrors chan error) (*Service, 
 	store := store.DataStore{Backend: ObserverAPIStore{mongodb, graphDB}}
 
 	// Setup the API
-	a := api.Setup(ctx, r, store)
+	a := api.Setup(ctx, r, cfg, store)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)

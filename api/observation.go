@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ONSdigital/dp-graph/v2/observation"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
-	"github.com/ONSdigital/dp-graph/v2/observation"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -86,7 +86,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// TODO implement auth once the auth features are moved to their own library
-		authorised := true
+		authorised := api.authenticate(r, logData)
 
 		var (
 			state   string

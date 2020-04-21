@@ -33,9 +33,11 @@ func main() {
 func run() error {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
+	ctx := context.Background()
 
+	// Run the service, providing an error channel for fatal errors
 	svcErrors := make(chan error, 1)
-	svc, err := service.Run(BuildTime, GitCommit, Version, svcErrors)
+	svc, err := service.Run(ctx, BuildTime, GitCommit, Version, svcErrors)
 	if err != nil {
 		return errors.Wrap(err, "running service failed")
 	}
@@ -43,11 +45,10 @@ func run() error {
 	// blocks until an os interrupt or a fatal error occurs
 	select {
 	case err := <-svcErrors:
-		return errors.Wrap(err, "service error received")
+		log.Event(ctx, "service error received", log.ERROR, log.Error(err))
 	case sig := <-signals:
-		ctx := context.Background()
 		log.Event(ctx, "os signal received", log.Data{"signal": sig}, log.INFO)
-		svc.Close(ctx)
 	}
+	svc.Close(context.Background())
 	return nil
 }

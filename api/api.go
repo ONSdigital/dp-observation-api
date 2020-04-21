@@ -4,27 +4,58 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/store"
+	"github.com/ONSdigital/go-ns/common"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 )
 
 //API provides a struct to wrap the api around
 type API struct {
-	Router    *mux.Router
-	dataStore store.DataStore
+	Router               *mux.Router
+	dataStore            store.DataStore
+	EnablePrePublishView bool
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, dataStore store.DataStore) *API {
+func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore store.DataStore) *API {
 	api := &API{
-		Router:    r,
-		dataStore: dataStore,
+		Router:               r,
+		dataStore:            dataStore,
+		EnablePrePublishView: cfg.EnablePrivateEnpoints,
 	}
 
 	r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
-	r.HandleFunc("/hello", HelloHandler()).Methods("GET") // TODO remove this endpoint
 	return api
+}
+
+func (api *API) authenticate(r *http.Request, logData log.Data) bool {
+	var authorised bool
+
+	if api.EnablePrePublishView {
+		var hasCallerIdentity, hasUserIdentity bool
+
+		callerIdentity := common.Caller(r.Context())
+		if callerIdentity != "" {
+			logData["caller_identity"] = callerIdentity
+			hasCallerIdentity = true
+		}
+
+		userIdentity := common.User(r.Context())
+		if userIdentity != "" {
+			logData["user_identity"] = userIdentity
+			hasUserIdentity = true
+		}
+
+		if hasCallerIdentity || hasUserIdentity {
+			authorised = true
+		}
+		logData["authenticated"] = authorised
+
+		return authorised
+	}
+	return authorised
 }
 
 func setJSONContentType(w http.ResponseWriter) {

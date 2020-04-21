@@ -12,6 +12,7 @@ type Config struct {
 	GracefulShutdownTimeout    time.Duration `envconfig:"GRACEFUL_SHUTDOWN_TIMEOUT"`
 	HealthCheckInterval        time.Duration `envconfig:"HEALTHCHECK_INTERVAL"`
 	HealthCheckCriticalTimeout time.Duration `envconfig:"HEALTHCHECK_CRITICAL_TIMEOUT"`
+	EnablePrivateEnpoints      bool          `envconfig:"ENABLE_PRIVATE_ENDPOINTS"`
 	MongoConfig                MongoConfig
 }
 
@@ -36,6 +37,12 @@ func Get() (*Config, error) {
 		GracefulShutdownTimeout:    5 * time.Second,
 		HealthCheckInterval:        10 * time.Second,
 		HealthCheckCriticalTimeout: time.Minute,
+		EnablePrivateEnpoints:      false,
+		MongoConfig: MongoConfig{
+			BindAddr:   "localhost:27017",
+			Collection: "datasets",
+			Database:   "datasets",
+		},
 	}
 
 	return cfg, envconfig.Process("", cfg)
