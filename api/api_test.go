@@ -2,9 +2,12 @@ package api
 
 import (
 	"context"
-	"github.com/gorilla/mux"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/ONSdigital/dp-observation-api/store"
+	storetest "github.com/ONSdigital/dp-observation-api/store/datastoretest"
+	"github.com/gorilla/mux"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -13,11 +16,13 @@ func TestSetup(t *testing.T) {
 	Convey("Given an API instance", t, func() {
 		r := mux.NewRouter()
 		ctx := context.Background()
-		api := Setup(ctx, r)
+		storeMock := &storetest.StorerMock{}
+		api := Setup(ctx, r, store.DataStore{Backend: storeMock})
 
 		Convey("When created the following routes should have been added", func() {
 			// Replace the check below with any newly added api endpoints
 			So(hasRoute(api.Router, "/hello", "GET"), ShouldBeTrue)
+			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
 		})
 	})
 }
@@ -26,7 +31,8 @@ func TestClose(t *testing.T) {
 	Convey("Given an API instance", t, func() {
 		r := mux.NewRouter()
 		ctx := context.Background()
-		a := Setup(ctx, r)
+		storeMock := &storetest.StorerMock{}
+		a := Setup(ctx, r, store.DataStore{Backend: storeMock})
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := a.Close(ctx)

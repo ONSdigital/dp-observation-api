@@ -13,7 +13,7 @@ build:
 .PHONY: debug
 debug:
 	go build -tags 'debug' $(LDFLAGS) -o $(BINPATH)/dp-observation-api
-	HUMAN_LOG=1 DEBUG=1 $(BINPATH)/dp-observation-api
+	GRAPH_DRIVER_TYPE="neo4j" GRAPH_ADDR="bolt://localhost:7687" HUMAN_LOG=1 DEBUG=1 $(BINPATH)/dp-observation-api
 
 .PHONY: test
 test:
