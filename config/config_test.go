@@ -19,7 +19,8 @@ func TestConfig(t *testing.T) {
 
 			Convey("Then the values should be set to the expected defaults", func() {
 				So(cfg.GracefulShutdownTimeout, ShouldEqual, 5*time.Second)
-				So(cfg.HealthCheckCriticalTimeout, ShouldEqual, 1*time.Minute)
+				So(cfg.HealthCheckInterval, ShouldEqual, 30*time.Second)
+				So(cfg.HealthCheckCriticalTimeout, ShouldEqual, 90*time.Second)
 				So(cfg.BindAddr, ShouldEqual, ":24500")
 			})
 
