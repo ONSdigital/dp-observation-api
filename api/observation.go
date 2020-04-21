@@ -326,48 +326,11 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *models.Versi
 			return nil, err
 		}
 
-		// TODO for the below maybe put this in a seperate function?
-		observation := models.Observation{
-			Observation: observationRowArray[0],
-		}
-
-		// add observation metadata
-		if dimensionOffset != 0 {
-			observationMetaData := make(map[string]string)
-
-			for i := 1; i < dimensionOffset+1; i++ {
-				observationMetaData[headerRowArray[i]] = observationRowArray[i]
-			}
-
-			observation.Metadata = observationMetaData
-		}
-
-		if wildcardParameter != "" {
-			dimensions := make(map[string]*models.DimensionObject)
-
-			for i := dimensionOffset + 2; i < len(observationRowArray); i += 2 {
-
-				if strings.ToLower(headerRowArray[i]) == wildcardParameter {
-					for _, versionDimension := range versionDoc.Dimensions {
-						if versionDimension.Name == wildcardParameter {
-
-							dimensions[headerRowArray[i]] = &models.DimensionObject{
-								ID:    observationRowArray[i-1],
-								HRef:  versionDimension.HRef + "/codes/" + observationRowArray[i-1],
-								Label: observationRowArray[i],
-							}
-
-							break
-						}
-					}
-
-					break
-				}
-			}
-			observation.Dimensions = dimensions
-		}
-
-		observations = append(observations, observation)
+		observations = append(observations, createObservation(
+			versionDoc,
+			observationRowArray,
+			headerRowArray,
+			dimensionOffset, wildcardParameter))
 	}
 
 	// neo4j will always return the same list of observations in the same
@@ -376,6 +339,49 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *models.Versi
 	// order (which may be costly on the services performance)
 
 	return observations, nil
+}
+
+func createObservation(versionDoc *models.Version, observationRowArray, headerRowArray []string, dimensionOffset int, wildcardParameter string) models.Observation {
+	observation := models.Observation{
+		Observation: observationRowArray[0],
+	}
+
+	// add observation metadata
+	if dimensionOffset != 0 {
+		observationMetaData := make(map[string]string)
+
+		for i := 1; i < dimensionOffset+1; i++ {
+			observationMetaData[headerRowArray[i]] = observationRowArray[i]
+		}
+
+		observation.Metadata = observationMetaData
+	}
+
+	if wildcardParameter != "" {
+		dimensions := make(map[string]*models.DimensionObject)
+
+		for i := dimensionOffset + 2; i < len(observationRowArray); i += 2 {
+
+			if strings.ToLower(headerRowArray[i]) == wildcardParameter {
+				for _, versionDimension := range versionDoc.Dimensions {
+					if versionDimension.Name == wildcardParameter {
+
+						dimensions[headerRowArray[i]] = &models.DimensionObject{
+							ID:    observationRowArray[i-1],
+							HRef:  versionDimension.HRef + "/codes/" + observationRowArray[i-1],
+							Label: observationRowArray[i],
+						}
+
+						break
+					}
+				}
+
+				break
+			}
+		}
+		observation.Dimensions = dimensions
+	}
+	return observation
 }
 
 func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err error, data log.Data) {

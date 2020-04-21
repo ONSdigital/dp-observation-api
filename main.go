@@ -49,6 +49,5 @@ func run() error {
 	case sig := <-signals:
 		log.Event(ctx, "os signal received", log.Data{"signal": sig}, log.INFO)
 	}
-	svc.Close(context.Background())
-	return nil
+	return svc.Close(context.Background())
 }

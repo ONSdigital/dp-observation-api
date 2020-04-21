@@ -5,6 +5,7 @@ import (
 
 	"github.com/ONSdigital/dp-graph/v2/graph"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	mongolib "github.com/ONSdigital/dp-mongodb"
 	mongoHealth "github.com/ONSdigital/dp-mongodb/health"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
@@ -17,13 +18,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Service contains all the configs and clients to run the observation API
+// Service contains all the configs, server and clients to run the observation API
 type Service struct {
-	Config      *config.Config
+	config      *config.Config
 	server      *server.Server
-	Router      *mux.Router
-	API         *api.API
-	HealthCheck *healthcheck.HealthCheck
+	router      *mux.Router
+	api         *api.API
+	serviceList *initialise.ExternalServiceList
+	healthCheck *healthcheck.HealthCheck
+	mongodb     *mongo.Mongo
+	graphDB     *graph.DB
 }
 
 //ObserverAPIStore is a wrapper which embeds Neo4j Mongo structs which between them satisfy the store.Storer interface.
@@ -36,6 +40,7 @@ type ObserverAPIStore struct {
 func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
 	log.Event(ctx, "running service", log.INFO)
 
+	// Read config
 	cfg, err := config.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to retrieve service configuration")
@@ -82,6 +87,7 @@ func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors ch
 	r.StrictSlash(true).Path("/health").HandlerFunc(hc.Handler)
 	hc.Start(ctx)
 
+	// Run the http server in a new go-routine
 	go func() {
 		if err := s.ListenAndServe(); err != nil {
 			svcErrors <- errors.Wrap(err, "failure in http listen and serve")
@@ -89,33 +95,80 @@ func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors ch
 	}()
 
 	return &Service{
-		Config:      cfg,
-		Router:      r,
-		API:         a,
-		HealthCheck: &hc,
+		config:      cfg,
+		router:      r,
+		api:         a,
+		healthCheck: &hc,
 		server:      s,
+		serviceList: &serviceList,
+		mongodb:     mongodb,
+		graphDB:     graphDB,
 	}, nil
 }
 
-// Gracefully shutdown the service
-func (svc *Service) Close(ctx context.Context) {
-	timeout := svc.Config.GracefulShutdownTimeout
+// Close gracefully shuts the service down in the required order, with timeout
+func (svc *Service) Close(ctx context.Context) error {
+	timeout := svc.config.GracefulShutdownTimeout
 	log.Event(ctx, "commencing graceful shutdown", log.Data{"graceful_shutdown_timeout": timeout}, log.INFO)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
-	// stop any incoming requests before closing any outbound connections
-	if err := svc.server.Shutdown(ctx); err != nil {
-		log.Event(ctx, "failed to shutdown http server", log.Error(err), log.ERROR)
+	// track shutdown gracefully closes app
+	var gracefulShutdown bool
+
+	go func() {
+		defer cancel()
+		var hasShutdownError bool
+
+		// stop healthcheck, as it depends on everything else
+		if svc.serviceList.HealthCheck {
+			svc.healthCheck.Stop()
+		}
+
+		// stop any incoming requests before closing any outbound connections
+		if err := svc.server.Shutdown(ctx); err != nil {
+			log.Event(ctx, "failed to shutdown http server", log.Error(err), log.ERROR)
+		}
+
+		// close any API dependency
+		if err := svc.api.Close(ctx); err != nil {
+			log.Event(ctx, "error closing API", log.Error(err), log.ERROR)
+		}
+
+		// close mongodb
+		if svc.serviceList.MongoDB {
+			if err := mongolib.Close(ctx, svc.mongodb.Session); err != nil {
+				log.Event(ctx, "failed to close mongo db session", log.ERROR, log.Error(err))
+				hasShutdownError = true
+			}
+		}
+
+		// close graph database
+		if svc.serviceList.Graph {
+			if err := svc.graphDB.Close(ctx); err != nil {
+				log.Event(ctx, "failed to close graph db", log.ERROR, log.Error(err))
+				hasShutdownError = true
+			}
+		}
+
+		if !hasShutdownError {
+			gracefulShutdown = true
+		}
+	}()
+
+	// wait for shutdown success (via cancel) or failure (timeout)
+	<-ctx.Done()
+
+	if !gracefulShutdown {
+		err := errors.New("failed to shutdown gracefully")
+		log.Event(ctx, "failed to shutdown gracefully ", log.ERROR, log.Error(err))
+		return err
 	}
 
-	if err := svc.API.Close(ctx); err != nil {
-		log.Event(ctx, "error closing API", log.Error(err), log.ERROR)
-	}
-
-	log.Event(ctx, "graceful shutdown complete", log.INFO)
+	log.Event(ctx, "graceful shutdown was successful", log.INFO)
+	return nil
 }
 
+// registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
 func registerCheckers(ctx context.Context,
 	hc *healthcheck.HealthCheck,
 	graphDB *graph.DB,
