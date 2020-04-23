@@ -3,16 +3,9 @@ package service
 import (
 	"context"
 
-	"github.com/ONSdigital/dp-graph/v2/graph"
-	"github.com/ONSdigital/dp-healthcheck/healthcheck"
-	mongolib "github.com/ONSdigital/dp-mongodb"
-	mongoHealth "github.com/ONSdigital/dp-mongodb/health"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/initialise"
-	"github.com/ONSdigital/dp-observation-api/mongo"
 	"github.com/ONSdigital/dp-observation-api/store"
-	"github.com/ONSdigital/go-ns/server"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -21,23 +14,23 @@ import (
 // Service contains all the configs, server and clients to run the observation API
 type Service struct {
 	config      *config.Config
-	server      *server.Server
+	server      IServer
 	router      *mux.Router
 	api         *api.API
-	serviceList *initialise.ExternalServiceList
-	healthCheck *healthcheck.HealthCheck
-	mongodb     *mongo.Mongo
-	graphDB     *graph.DB
+	serviceList *ExternalServiceList
+	healthCheck IHealthCheck
+	mongodb     IMongo
+	graphDB     IGraph
 }
 
 //ObserverAPIStore is a wrapper which embeds Neo4j Mongo structs which between them satisfy the store.Storer interface.
 type ObserverAPIStore struct {
-	*mongo.Mongo
-	*graph.DB
+	IMongo
+	IGraph
 }
 
 // Run the service with its dependencies
-func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
+func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
 	log.Event(ctx, "running service", log.INFO)
 
 	// Read config
@@ -47,16 +40,12 @@ func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors ch
 	}
 	log.Event(ctx, "got service configuration", log.Data{"config": cfg}, log.INFO)
 
-	// External services and their initialization state
-	var serviceList initialise.ExternalServiceList
-
+	// Get HTTP Server
 	r := mux.NewRouter()
-
-	s := server.New(cfg.BindAddr, r)
-	s.HandleOSSignals = false
+	s := serviceList.GetHTTPServer(cfg.BindAddr, r)
 
 	// Get mongoDB connection for observation store
-	mongoClient, mongodb, err := serviceList.GetMongoDB(ctx, cfg)
+	mongodb, err := serviceList.GetMongoDB(ctx, cfg)
 	if err != nil {
 		log.Event(ctx, "could not obtain mongo session", log.ERROR, log.Error(err))
 		return nil, err
@@ -80,7 +69,7 @@ func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors ch
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, &hc, graphDB, mongoClient); err != nil {
+	if err := registerCheckers(ctx, hc, graphDB, mongodb); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -98,9 +87,9 @@ func Run(ctx context.Context, buildTime, gitCommit, version string, svcErrors ch
 		config:      cfg,
 		router:      r,
 		api:         a,
-		healthCheck: &hc,
+		healthCheck: hc,
 		server:      s,
-		serviceList: &serviceList,
+		serviceList: serviceList,
 		mongodb:     mongodb,
 		graphDB:     graphDB,
 	}, nil
@@ -125,8 +114,10 @@ func (svc *Service) Close(ctx context.Context) error {
 		}
 
 		// stop any incoming requests before closing any outbound connections
-		if err := svc.server.Shutdown(ctx); err != nil {
-			log.Event(ctx, "failed to shutdown http server", log.Error(err), log.ERROR)
+		if svc.serviceList.HTTPServer {
+			if err := svc.server.Shutdown(ctx); err != nil {
+				log.Event(ctx, "failed to shutdown http server", log.Error(err), log.ERROR)
+			}
 		}
 
 		// close any API dependency
@@ -136,7 +127,7 @@ func (svc *Service) Close(ctx context.Context) error {
 
 		// close mongodb
 		if svc.serviceList.MongoDB {
-			if err := mongolib.Close(ctx, svc.mongodb.Session); err != nil {
+			if err := svc.mongodb.Close(ctx); err != nil {
 				log.Event(ctx, "failed to close mongo db session", log.ERROR, log.Error(err))
 				hasShutdownError = true
 			}
@@ -170,22 +161,18 @@ func (svc *Service) Close(ctx context.Context) error {
 
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
 func registerCheckers(ctx context.Context,
-	hc *healthcheck.HealthCheck,
-	graphDB *graph.DB,
-	mongoClient *mongoHealth.Client) (err error) {
+	hc IHealthCheck,
+	graphDB IGraph,
+	mongodb IMongo) (err error) {
 
 	hasErrors := false
 
-	if err = hc.AddCheck("Graph DB", graphDB.Driver.Checker); err != nil {
+	if err = hc.AddCheck("Graph DB", graphDB.Checker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for graph db", log.ERROR, log.Error(err))
 	}
 
-	mongoHealth := mongoHealth.CheckMongoClient{
-		Client:      *mongoClient,
-		Healthcheck: mongoClient.Healthcheck,
-	}
-	if err = hc.AddCheck("Mongo DB", mongoHealth.Checker); err != nil {
+	if err = hc.AddCheck("Mongo DB", mongodb.Checker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for mongo db", log.ERROR, log.Error(err))
 	}

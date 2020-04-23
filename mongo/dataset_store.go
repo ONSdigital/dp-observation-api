@@ -1,51 +1,79 @@
 package mongo
 
 import (
+	"context"
 	"errors"
 	"strconv"
-	"time"
 
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 
+	mongolib "github.com/ONSdigital/dp-mongodb"
+
+	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	mongoHealth "github.com/ONSdigital/dp-mongodb/health"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
 )
 
-// Mongo represents a simplistic MongoDB configuration.
+// Mongo represents a simplistic MongoDB configuration, and holds the session and healthclient
 type Mongo struct {
-	// CodeListURL    string
-	Collection string
-	Database   string
-	// DatasetURL     string
-	Session        *mgo.Session
-	URI            string
-	lastPingTime   time.Time // TODO add ping?
-	lastPingResult error
+	Collection   string
+	Database     string
+	URI          string
+	session      *mgo.Session
+	healthClient *mongoHealth.CheckMongoClient
 }
 
 const (
 	editionsCollection = "editions"
 )
 
-// Init creates a new mgo.Session with a strong consistency and a write mode of "majortiy".
+// Init creates a new mgo.Session for this Mongo object, with a strong consistency and a write mode of "majortiy".
 func (m *Mongo) Init() (session *mgo.Session, err error) {
-	if session != nil {
+	if m.session != nil {
 		return nil, errors.New("session already exists")
 	}
 
-	if session, err = mgo.Dial(m.URI); err != nil {
+	// Create session
+	if m.session, err = mgo.Dial(m.URI); err != nil {
 		return nil, err
 	}
+	m.session.EnsureSafe(&mgo.Safe{WMode: "majority"})
+	m.session.SetMode(mgo.Strong, true)
+	m.session = session
 
-	session.EnsureSafe(&mgo.Safe{WMode: "majority"})
-	session.SetMode(mgo.Strong, true)
-	return session, nil
+	// Create healthclient from client using the created session
+	client := mongoHealth.NewClient(session)
+	m.healthClient = &mongoHealth.CheckMongoClient{
+		Client:      *client,
+		Healthcheck: client.Healthcheck,
+	}
+
+	return m.session, nil
+}
+
+// Session is a getter for the MongoDB session
+func (m *Mongo) Session() *mgo.Session {
+	return m.session
+}
+
+// Close closes teh mongoDB session using dp-mongo library
+func (m *Mongo) Close(ctx context.Context) error {
+	return mongolib.Close(ctx, m.session)
+}
+
+// Checker calls the mongo health client Checker
+func (m *Mongo) Checker(ctx context.Context, state *healthcheck.CheckState) error {
+	if m.healthClient == nil {
+		return errors.New("client not initialised")
+	}
+	return m.healthClient.Checker(ctx, state)
 }
 
 // GetDataset retrieves a dataset document
 func (m *Mongo) GetDataset(id string) (*models.DatasetUpdate, error) {
-	s := m.Session.Copy()
+	s := m.session.Copy()
 	defer s.Close()
 	var dataset models.DatasetUpdate
 	err := s.DB(m.Database).C("datasets").Find(bson.M{"_id": id}).One(&dataset)
@@ -61,7 +89,7 @@ func (m *Mongo) GetDataset(id string) (*models.DatasetUpdate, error) {
 
 // GetVersion retrieves a version document for a dataset edition
 func (m *Mongo) GetVersion(id, editionID, versionID, state string) (*models.Version, error) {
-	s := m.Session.Copy()
+	s := m.session.Copy()
 	defer s.Close()
 
 	versionNumber, err := strconv.Atoi(versionID)
@@ -83,7 +111,7 @@ func (m *Mongo) GetVersion(id, editionID, versionID, state string) (*models.Vers
 
 // CheckEditionExists checks that the edition of a dataset exists
 func (m *Mongo) CheckEditionExists(id, editionID, state string) error {
-	s := m.Session.Copy()
+	s := m.session.Copy()
 	defer s.Close()
 
 	var query bson.M

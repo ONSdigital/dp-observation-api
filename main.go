@@ -37,7 +37,8 @@ func run() error {
 
 	// Run the service, providing an error channel for fatal errors
 	svcErrors := make(chan error, 1)
-	svc, err := service.Run(ctx, BuildTime, GitCommit, Version, svcErrors)
+	svcList := service.NewServiceList(&service.Init{})
+	svc, err := service.Run(ctx, svcList, BuildTime, GitCommit, Version, svcErrors)
 	if err != nil {
 		return errors.Wrap(err, "running service failed")
 	}
