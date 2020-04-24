@@ -6,7 +6,6 @@ import (
 
 	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/store"
-	"github.com/ONSdigital/go-ns/common"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 )
@@ -31,31 +30,8 @@ func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore sto
 }
 
 func (api *API) authenticate(r *http.Request, logData log.Data) bool {
-	var authorised bool
-
-	if api.EnablePrePublishView {
-		var hasCallerIdentity, hasUserIdentity bool
-
-		callerIdentity := common.Caller(r.Context())
-		if callerIdentity != "" {
-			logData["caller_identity"] = callerIdentity
-			hasCallerIdentity = true
-		}
-
-		userIdentity := common.User(r.Context())
-		if userIdentity != "" {
-			logData["user_identity"] = userIdentity
-			hasUserIdentity = true
-		}
-
-		if hasCallerIdentity || hasUserIdentity {
-			authorised = true
-		}
-		logData["authenticated"] = authorised
-
-		return authorised
-	}
-	return authorised
+	// TODO we should call the authentication/authorisation library here
+	return false
 }
 
 func setJSONContentType(w http.ResponseWriter) {

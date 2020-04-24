@@ -30,7 +30,7 @@ const (
 )
 
 // Init creates a new mgo.Session for this Mongo object, with a strong consistency and a write mode of "majortiy".
-func (m *Mongo) Init() (session *mgo.Session, err error) {
+func (m *Mongo) Init() (s *mgo.Session, err error) {
 	if m.session != nil {
 		return nil, errors.New("session already exists")
 	}
@@ -41,10 +41,9 @@ func (m *Mongo) Init() (session *mgo.Session, err error) {
 	}
 	m.session.EnsureSafe(&mgo.Safe{WMode: "majority"})
 	m.session.SetMode(mgo.Strong, true)
-	m.session = session
 
 	// Create healthclient from client using the created session
-	client := mongoHealth.NewClient(session)
+	client := mongoHealth.NewClient(m.session)
 	m.healthClient = &mongoHealth.CheckMongoClient{
 		Client:      *client,
 		Healthcheck: client.Healthcheck,
