@@ -106,7 +106,7 @@ job "dp-observation-api" {
       }
 
       service {
-        name = dp-observation-api
+        name = "dp-observation-api"
         port = "http"
         tags = ["publishing"]
 

@@ -12,17 +12,15 @@ import (
 
 //API provides a struct to wrap the api around
 type API struct {
-	Router               *mux.Router
-	dataStore            store.DataStore
-	EnablePrePublishView bool
+	Router    *mux.Router
+	dataStore store.DataStore
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
 func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore store.DataStore) *API {
 	api := &API{
-		Router:               r,
-		dataStore:            dataStore,
-		EnablePrePublishView: cfg.EnablePrivateEnpoints,
+		Router:    r,
+		dataStore: dataStore,
 	}
 
 	r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)

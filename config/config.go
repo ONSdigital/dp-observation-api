@@ -35,9 +35,8 @@ func Get() (*Config, error) {
 	cfg := &Config{
 		BindAddr:                   ":24500",
 		GracefulShutdownTimeout:    5 * time.Second,
-		HealthCheckInterval:        10 * time.Second,
-		HealthCheckCriticalTimeout: time.Minute,
-		EnablePrivateEnpoints:      false,
+		HealthCheckInterval:        30 * time.Second,
+		HealthCheckCriticalTimeout: 90 * time.Second,
 		MongoConfig: MongoConfig{
 			BindAddr:   "localhost:27017",
 			Collection: "datasets",
