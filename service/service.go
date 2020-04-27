@@ -48,7 +48,7 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 	datasetAPICli := dataset.NewAPIClient(cfg.DatasetAPIURL)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cfg.ServiceAuthToken)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)

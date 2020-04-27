@@ -22,6 +22,7 @@ func TestConfig(t *testing.T) {
 					BindAddr:                   ":24500",
 					ServiceAuthToken:           "",
 					DatasetAPIURL:              "http://localhost:22000",
+					DefaultObservationLimit:    10000,
 					GracefulShutdownTimeout:    5 * time.Second,
 					HealthCheckInterval:        30 * time.Second,
 					HealthCheckCriticalTimeout: 90 * time.Second,

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +12,7 @@ import (
 
 	dataset "github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
+	"github.com/ONSdigital/dp-observation-api/apierrors"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
 	"github.com/ONSdigital/log.go/log"
@@ -23,8 +23,7 @@ import (
 // Upper limit, if this is not big enough, we may need to consider increasing value
 // and then if this has a performance hit then consider paging
 const (
-	defaultObservationLimit = 10000
-	defaultOffset           = 0
+	defaultOffset = 0
 
 	getObservationsAction = "getObservations"
 )
@@ -41,35 +40,6 @@ var (
 		errs.ErrTooManyWildcards: true,
 	}
 )
-
-type observationQueryError struct {
-	message string
-}
-
-func (e observationQueryError) Error() string {
-	return e.message
-}
-
-// ErrorIncorrectQueryParameters returns an error for incorrect selection of query paramters
-func ErrorIncorrectQueryParameters(params []string) error {
-	return observationQueryError{
-		message: fmt.Sprintf("incorrect selection of query parameters: %v, these dimensions do not exist for this version of the dataset", params),
-	}
-}
-
-// ErrorMissingQueryParameters returns an error for missing parameters
-func ErrorMissingQueryParameters(params []string) error {
-	return observationQueryError{
-		message: fmt.Sprintf("missing query parameters for the following dimensions: %v", params),
-	}
-}
-
-// ErrorMultivaluedQueryParameters returns an error for multi-valued query parameters
-func ErrorMultivaluedQueryParameters(params []string) error {
-	return observationQueryError{
-		message: fmt.Sprintf("multi-valued query parameters for the following dimensions: %v", params),
-	}
-}
 
 func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -92,7 +62,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		if !authorised {
 
 			// Get dataset from dataset API
-			datasetDoc, err := api.datasetClient.Get(ctx, "", api.serviceAuthToken, "", datasetID)
+			datasetDoc, err := api.datasetClient.Get(ctx, "", api.cfg.ServiceAuthToken, "", datasetID)
 			if err != nil {
 				log.Event(ctx, "get observations: dataset api get /datasets/{id} returned an error", log.ERROR, log.Error(err), logData)
 				return nil, err
@@ -107,7 +77,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get Version from dataset API
-		versionDoc, err := api.datasetClient.GetVersion(ctx, "", api.serviceAuthToken, "", "", datasetID, edition, version)
+		versionDoc, err := api.datasetClient.GetVersion(ctx, "", api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
 
 		// this is part of getVersion in dataset api
 		// if err = api.dataStore.Backend.CheckEditionExists(datasetID, edition, state); err != nil {
@@ -154,7 +124,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		logData["query_parameters"] = queryParameters
 
 		// retrieve observations
-		observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, defaultObservationLimit, dimensionOffset, logData)
+		observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, dimensionOffset, logData)
 		if err != nil {
 			log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
 			return nil, err
@@ -164,7 +134,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		usageNotes := &[]dataset.UsageNote{}
 		unitsOfMeasure := "usageNotes"
 
-		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, unitsOfMeasure, usageNotes, observations, queryParameters, defaultOffset, defaultObservationLimit), nil
+		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, unitsOfMeasure, usageNotes, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
 	}()
 
 	if err != nil {
@@ -246,11 +216,11 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	}
 
 	if len(incorrectQueryParameters) > 0 {
-		return nil, ErrorIncorrectQueryParameters(incorrectQueryParameters)
+		return nil, apierrors.ErrorIncorrectQueryParameters(incorrectQueryParameters)
 	}
 
 	if len(multivaluedQueryParameters) > 0 {
-		return nil, ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
+		return nil, apierrors.ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
 	}
 
 	// Determine if any dimensions have not been set in request query parameters
@@ -260,7 +230,7 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 				missingQueryParameters = append(missingQueryParameters, validDimension)
 			}
 		}
-		return nil, ErrorMissingQueryParameters(missingQueryParameters)
+		return nil, apierrors.ErrorMissingQueryParameters(missingQueryParameters)
 	}
 
 	return queryParameters, nil
@@ -396,7 +366,7 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 }
 
 func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err error, data log.Data) {
-	_, isObservationErr := err.(observationQueryError)
+	_, isObservationErr := err.(apierrors.ObservationQueryError)
 	var status int
 
 	switch {

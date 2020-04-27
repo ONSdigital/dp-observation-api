@@ -62,7 +62,7 @@ func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient) *api.API
 	defer mu.Unlock()
 	cfg, err := config.Get()
 	So(err, ShouldBeNil)
-	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, testServiceAuthToken)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {
