@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/store"
@@ -59,9 +60,10 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 	}
 
 	store := store.DataStore{Backend: ObserverAPIStore{mongodb, graphDB}}
+	datasetAPICli := dataset.NewAPIClient(cfg.DatasetAPIURL)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, store)
+	a := api.Setup(ctx, r, cfg, store, datasetAPICli, cfg.ServiceAuthToken)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
@@ -69,7 +71,7 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, mongodb); err != nil {
+	if err := registerCheckers(ctx, hc, graphDB, mongodb, datasetAPICli); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -163,7 +165,8 @@ func (svc *Service) Close(ctx context.Context) error {
 func registerCheckers(ctx context.Context,
 	hc IHealthCheck,
 	graphDB IGraph,
-	mongodb IMongo) (err error) {
+	mongodb IMongo,
+	datasetAPICli api.IDatasetClient) (err error) {
 
 	hasErrors := false
 
@@ -175,6 +178,11 @@ func registerCheckers(ctx context.Context,
 	if err = hc.AddCheck("Mongo DB", mongodb.Checker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for mongo db", log.ERROR, log.Error(err))
+	}
+
+	if err = hc.AddCheck("Dataset API", datasetAPICli.Checker); err != nil {
+		hasErrors = true
+		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
 	}
 
 	if hasErrors {

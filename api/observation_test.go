@@ -1,4 +1,4 @@
-package api
+package api_test
 
 import (
 	"bytes"
@@ -11,8 +11,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
 	observationtest "github.com/ONSdigital/dp-graph/v2/observation/observationtest"
+	"github.com/ONSdigital/dp-observation-api/api"
+	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
 	storetest "github.com/ONSdigital/dp-observation-api/store/datastoretest"
@@ -21,10 +24,10 @@ import (
 )
 
 var (
-	dimension1 = models.Dimension{Name: "aggregate"}
-	dimension2 = models.Dimension{Name: "geography"}
-	dimension3 = models.Dimension{Name: "time"}
-	dimension4 = models.Dimension{Name: "age"}
+	dimension1 = dataset.VersionDimension{Name: "aggregate"}
+	dimension2 = dataset.VersionDimension{Name: "geography"}
+	dimension3 = dataset.VersionDimension{Name: "time"}
+	dimension4 = dataset.VersionDimension{Name: "age"}
 )
 
 func TestGetObservationsReturnsOK(t *testing.T) {
@@ -33,18 +36,18 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 	t.Parallel()
 	Convey("Given a request to get a single observation for a version of a dataset returns 200 OK response", t, func() {
 
-		dimensions := []models.Dimension{
-			models.Dimension{
+		dimensions := []dataset.VersionDimension{
+			dataset.VersionDimension{
 				Name: "aggregate",
-				HRef: "http://localhost:8081/code-lists/cpih1dim1aggid",
+				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "geography",
-				HRef: "http://localhost:8081/code-lists/uk-only",
+				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "time",
-				HRef: "http://localhost:8081/code-lists/time",
+				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
 		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the obsevation with a special character"}}
@@ -92,7 +95,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
@@ -130,18 +135,18 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001", nil)
 		w := httptest.NewRecorder()
 
-		dimensions := []models.Dimension{
-			models.Dimension{
+		dimensions := []dataset.VersionDimension{
+			dataset.VersionDimension{
 				Name: "aggregate",
-				HRef: "http://localhost:8081/code-lists/cpih1dim1aggid",
+				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "geography",
-				HRef: "http://localhost:8081/code-lists/uk-only",
+				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "time",
-				HRef: "http://localhost:8081/code-lists/time",
+				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
 		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the observation with a special character"}}
@@ -190,7 +195,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
@@ -215,7 +222,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -234,7 +243,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -253,7 +264,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -275,7 +288,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -300,7 +315,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrVersionNotFound.Error())
@@ -325,7 +342,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -347,13 +366,15 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-					Dimensions: []models.Dimension{dimension1, dimension2, dimension3},
+					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -381,7 +402,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -403,14 +426,16 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-					Dimensions: []models.Dimension{dimension1, dimension2, dimension3},
+					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					Headers:    []string{"v4"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -431,14 +456,16 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-					Dimensions: []models.Dimension{dimension1, dimension3},
+					Dimensions: []dataset.VersionDimension{dimension1, dimension3},
 					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -461,14 +488,16 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-					Dimensions: []models.Dimension{dimension1, dimension2, dimension3, dimension4},
+					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3, dimension4},
 					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography", "age_code", "age"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -491,14 +520,16 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-					Dimensions: []models.Dimension{dimension1, dimension2, dimension3},
+					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -521,7 +552,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
 				return &models.Version{
-						Dimensions: []models.Dimension{dimension1, dimension2, dimension3},
+						Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 						Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
 						State:      models.PublishedState,
 					},
@@ -532,7 +563,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -548,18 +581,18 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001&geography=K02000002", nil)
 		w := httptest.NewRecorder()
 
-		dimensions := []models.Dimension{
-			models.Dimension{
+		dimensions := []dataset.VersionDimension{
+			dataset.VersionDimension{
 				Name: "aggregate",
-				HRef: "http://localhost:8081/code-lists/cpih1dim1aggid",
+				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "geography",
-				HRef: "http://localhost:8081/code-lists/uk-only",
+				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			models.Dimension{
+			dataset.VersionDimension{
 				Name: "time",
-				HRef: "http://localhost:8081/code-lists/time",
+				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
 		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the obsevation with a special character"}}
@@ -587,7 +620,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
-		api := GetAPIWithMocks(mockedDataStore)
+		dcMock := &mock.IDatasetClientMock{}
+
+		api := GetAPIWithMocks(mockedDataStore, dcMock)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -604,24 +639,24 @@ func TestGetListOfValidDimensionNames(t *testing.T) {
 	t.Parallel()
 	Convey("Given a list of valid dimension codelist objects", t, func() {
 		Convey("When getListOfValidDimensionNames is called", func() {
-			dimension1 := models.Dimension{
+			dimension1 := dataset.VersionDimension{
 				Name: "time",
 			}
 
-			dimension2 := models.Dimension{
+			dimension2 := dataset.VersionDimension{
 				Name: "aggregate",
 			}
 
-			dimension3 := models.Dimension{
+			dimension3 := dataset.VersionDimension{
 				Name: "geography",
 			}
 
 			version := &models.Version{
-				Dimensions: []models.Dimension{dimension1, dimension2, dimension3},
+				Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 			}
 
 			Convey("Then func returns the correct number of dimensions", func() {
-				validDimensions := getListOfValidDimensionNames(version.Dimensions)
+				validDimensions := api.GetListOfValidDimensionNames(version.Dimensions)
 
 				So(len(validDimensions), ShouldEqual, 3)
 				So(validDimensions[0], ShouldEqual, "time")
@@ -649,7 +684,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 			}
 
 			Convey("Then getListOfValidDimensionNames func returns the correct number of headers", func() {
-				dimensionOffset, err := getDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
 
 				So(err, ShouldBeNil)
 				So(dimensionOffset, ShouldEqual, 0)
@@ -668,7 +703,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 			}
 
 			Convey("Then getListOfValidDimensionNames func returns the correct number of headers", func() {
-				dimensionOffset, err := getDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
 
 				So(err, ShouldBeNil)
 				So(dimensionOffset, ShouldEqual, 2)
@@ -690,7 +725,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 				},
 			}
 			Convey("Then function returns error, `index out of range`", func() {
-				dimensionOffset, err := getDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
 
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldResemble, "index out of range")
@@ -713,7 +748,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 				},
 			}
 			Convey("Then function returns error, `index out of range`", func() {
-				dimensionOffset, err := getDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
 
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldResemble, "strconv.Atoi: parsing \"one\": invalid syntax")
@@ -740,7 +775,7 @@ func TestExtractQueryParameters(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			Convey("Then extractQueryParameters func returns a list of query parameters and their corresponding value", func() {
-				queryParameters, err := extractQueryParameters(r.URL.Query(), headers)
+				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldBeNil)
 				So(len(queryParameters), ShouldEqual, 3)
 				So(queryParameters["time"], ShouldEqual, "JAN08")
@@ -757,9 +792,9 @@ func TestExtractQueryParameters(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			Convey("Then extractQueryParameters func returns an error", func() {
-				queryParameters, err := extractQueryParameters(r.URL.Query(), headers)
+				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, errorMissingQueryParameters([]string{"aggregate"}))
+				So(err, ShouldResemble, api.ErrorMissingQueryParameters([]string{"aggregate"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})
@@ -772,9 +807,9 @@ func TestExtractQueryParameters(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			Convey("Then extractQueryParameters func returns an error", func() {
-				queryParameters, err := extractQueryParameters(r.URL.Query(), headers)
+				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, errorIncorrectQueryParameters([]string{"age"}))
+				So(err, ShouldResemble, api.ErrorIncorrectQueryParameters([]string{"age"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})
@@ -787,9 +822,9 @@ func TestExtractQueryParameters(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			Convey("Then extractQueryParameters func returns an error", func() {
-				queryParameters, err := extractQueryParameters(r.URL.Query(), headers)
+				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, errorMultivaluedQueryParameters([]string{"time"}))
+				So(err, ShouldResemble, api.ErrorMultivaluedQueryParameters([]string{"time"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})

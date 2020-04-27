@@ -3,6 +3,7 @@ module github.com/ONSdigital/dp-observation-api
 go 1.13
 
 require (
+	github.com/ONSdigital/dp-api-clients-go v1.9.0
 	github.com/ONSdigital/dp-graph/v2 v2.0.3
 	github.com/ONSdigital/dp-healthcheck v1.0.3
 	github.com/ONSdigital/dp-mongodb v1.2.0

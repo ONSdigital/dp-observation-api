@@ -1,17 +1,19 @@
 package models
 
+import "github.com/ONSdigital/dp-api-clients-go/dataset"
+
 const wildcard = "*"
 
 // ObservationsDoc represents information (observations) relevant to a version
 type ObservationsDoc struct {
-	Dimensions        map[string]Option `json:"dimensions"`
-	Limit             int               `json:"limit"`
-	Links             *ObservationLinks `json:"links"`
-	Observations      []Observation     `json:"observations"`
-	Offset            int               `json:"offset"`
-	TotalObservations int               `json:"total_observations"`
-	UnitOfMeasure     string            `json:"unit_of_measure,omitempty"`
-	UsageNotes        *[]UsageNote      `json:"usage_notes,omitempty"`
+	Dimensions        map[string]Option    `json:"dimensions"`
+	Limit             int                  `json:"limit"`
+	Links             *ObservationLinks    `json:"links"`
+	Observations      []Observation        `json:"observations"`
+	Offset            int                  `json:"offset"`
+	TotalObservations int                  `json:"total_observations"`
+	UnitOfMeasure     string               `json:"unit_of_measure,omitempty"`
+	UsageNotes        *[]dataset.UsageNote `json:"usage_notes,omitempty"`
 }
 
 // Observation represents an object containing a single
@@ -43,27 +45,27 @@ type Option struct {
 }
 
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
-func CreateObservationsDoc(rawQuery string, versionDoc *Version, datasetDoc *Dataset, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
+func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, unitOfMeasure string, usageNotes *[]dataset.UsageNote, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
 
 	observationsDoc := &ObservationsDoc{
 		Limit: limit,
 		Links: &ObservationLinks{
 			DatasetMetadata: &LinkObject{
-				HRef: versionDoc.Links.Version.HRef + "/metadata",
+				HRef: versionDoc.Links.Version.URL + "/metadata",
 			},
 			Self: &LinkObject{
-				HRef: versionDoc.Links.Version.HRef + "/observations?" + rawQuery,
+				HRef: versionDoc.Links.Version.URL + "/observations?" + rawQuery,
 			},
 			Version: &LinkObject{
-				HRef: versionDoc.Links.Version.HRef,
+				HRef: versionDoc.Links.Version.URL,
 				ID:   versionDoc.Links.Version.ID,
 			},
 		},
 		Observations:      observations,
 		Offset:            offset,
 		TotalObservations: len(observations),
-		UnitOfMeasure:     datasetDoc.UnitOfMeasure,
-		UsageNotes:        versionDoc.UsageNotes,
+		UnitOfMeasure:     unitOfMeasure, // TODO dataset api should return this?
+		UsageNotes:        usageNotes,    // TODO dataset api should return this?
 	}
 
 	var dimensions = make(map[string]Option)
@@ -75,7 +77,7 @@ func CreateObservationsDoc(rawQuery string, versionDoc *Version, datasetDoc *Dat
 			if dimension.Name == paramKey && paramValue != wildcard {
 
 				linkObject := &LinkObject{
-					HRef: dimension.HRef + "/codes/" + paramValue,
+					HRef: dimension.URL + "/codes/" + paramValue,
 					ID:   paramValue,
 				}
 				linkObjects = append(linkObjects, linkObject)

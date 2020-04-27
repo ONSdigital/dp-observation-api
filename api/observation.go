@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	dataset "github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
@@ -49,19 +50,22 @@ func (e observationQueryError) Error() string {
 	return e.message
 }
 
-func errorIncorrectQueryParameters(params []string) error {
+// ErrorIncorrectQueryParameters returns an error for incorrect selection of query paramters
+func ErrorIncorrectQueryParameters(params []string) error {
 	return observationQueryError{
 		message: fmt.Sprintf("incorrect selection of query parameters: %v, these dimensions do not exist for this version of the dataset", params),
 	}
 }
 
-func errorMissingQueryParameters(params []string) error {
+// ErrorMissingQueryParameters returns an error for missing parameters
+func ErrorMissingQueryParameters(params []string) error {
 	return observationQueryError{
 		message: fmt.Sprintf("missing query parameters for the following dimensions: %v", params),
 	}
 }
 
-func errorMultivaluedQueryParameters(params []string) error {
+// ErrorMultivaluedQueryParameters returns an error for multi-valued query parameters
+func ErrorMultivaluedQueryParameters(params []string) error {
 	return observationQueryError{
 		message: fmt.Sprintf("multi-valued query parameters for the following dimensions: %v", params),
 	}
@@ -77,72 +81,72 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	// TODO call audit (attempt) once it has its own library
 	logData := log.Data{"dataset_id": datasetID, "edition": edition, "version": version}
 
+	// TODO call dataset API getVersion via dp-api-clients-go:
+
 	observationsDoc, err := func() (*models.ObservationsDoc, error) {
-		// get dataset document
-		datasetDoc, err := api.dataStore.Backend.GetDataset(datasetID)
-		if err != nil {
-			log.Event(ctx, "get observations: datastore.GetDataset returned an error", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
 
 		// TODO implement auth once the auth features are moved to their own library
 		authorised := api.authenticate(r, logData)
 
-		var (
-			state   string
-			dataset *models.Dataset
-		)
-
-		// if request is not authenticated then only access resources of state published
+		// If request is not authenticated then only access resources of state published
 		if !authorised {
-			// Check for current sub document
-			if datasetDoc.Current == nil || datasetDoc.Current.State != models.PublishedState {
-				logData["dataset_doc"] = datasetDoc.Current
+
+			// Get dataset from dataset API
+			datasetDoc, err := api.datasetClient.Get(ctx, "", api.serviceAuthToken, "", datasetID)
+			if err != nil {
+				log.Event(ctx, "get observations: dataset api get /datasets/{id} returned an error", log.ERROR, log.Error(err), logData)
+				return nil, err
+			}
+
+			// Check for current sub document state
+			if datasetDoc.State != models.PublishedState {
+				logData["dataset_doc"] = datasetDoc
 				log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
 				return nil, errs.ErrDatasetNotFound
 			}
-
-			dataset = datasetDoc.Current
-			state = dataset.State
-		} else {
-			dataset = datasetDoc.Next
 		}
 
-		if err = api.dataStore.Backend.CheckEditionExists(datasetID, edition, state); err != nil {
-			log.Event(ctx, "get observations: failed to find edition for dataset", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
+		// Get Version from dataset API
+		versionDoc, err := api.datasetClient.GetVersion(ctx, "", api.serviceAuthToken, "", "", datasetID, edition, version)
 
-		versionDoc, err := api.dataStore.Backend.GetVersion(datasetID, edition, version, state)
-		if err != nil {
-			log.Event(ctx, "get observations: failed to find version for dataset edition", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
+		// this is part of getVersion in dataset api
+		// if err = api.dataStore.Backend.CheckEditionExists(datasetID, edition, state); err != nil {
+		// 	log.Event(ctx, "get observations: failed to find edition for dataset", log.ERROR, log.Error(err), logData)
+		// 	return nil, err
+		// }
 
-		if err = models.CheckState("version", versionDoc.State); err != nil {
-			logData["state"] = versionDoc.State
-			log.Event(ctx, "get observations: unpublished version has an invalid state", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
+		// versionDoc, err := api.dataStore.Backend.GetVersion(datasetID, edition, version, state)
+		// if err != nil {
+		// 	log.Event(ctx, "get observations: failed to find version for dataset edition", log.ERROR, log.Error(err), logData)
+		// 	return nil, err
+		// }
 
-		if versionDoc.Headers == nil || versionDoc.Dimensions == nil {
+		// if err = models.CheckState("version", versionDoc.State); err != nil {
+		// 	logData["state"] = versionDoc.State
+		// 	log.Event(ctx, "get observations: unpublished version has an invalid state", log.ERROR, log.Error(err), logData)
+		// 	return nil, err
+		// }
+
+		// versionDoc is the return from getVersion
+		// if versionDoc.Headers == nil || versionDoc.Dimensions == nil {
+		if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
 			logData["version_doc"] = versionDoc
 			log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionHeadersOrDimensions), logData)
 			return nil, errs.ErrMissingVersionHeadersOrDimensions
 		}
 
 		// loop through version dimensions to retrieve list of dimension names
-		validDimensionNames := getListOfValidDimensionNames(versionDoc.Dimensions)
+		validDimensionNames := GetListOfValidDimensionNames(versionDoc.Dimensions)
 		logData["version_dimensions"] = validDimensionNames
 
-		dimensionOffset, err := getDimensionOffsetInHeaderRow(versionDoc.Headers)
+		dimensionOffset, err := GetDimensionOffsetInHeaderRow(versionDoc.CSVHeader)
 		if err != nil {
 			log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
 			return nil, err
 		}
 
 		// check query parameters match the version headers
-		queryParameters, err := extractQueryParameters(r.URL.Query(), validDimensionNames)
+		queryParameters, err := ExtractQueryParameters(r.URL.Query(), validDimensionNames)
 		if err != nil {
 			log.Event(ctx, "get observations: error extracting query parameters", log.ERROR, log.Error(err), logData)
 			return nil, err
@@ -150,13 +154,17 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		logData["query_parameters"] = queryParameters
 
 		// retrieve observations
-		observations, err := api.getObservationList(ctx, versionDoc, queryParameters, defaultObservationLimit, dimensionOffset, logData)
+		observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, defaultObservationLimit, dimensionOffset, logData)
 		if err != nil {
 			log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
 			return nil, err
 		}
 
-		return models.CreateObservationsDoc(r.URL.RawQuery, versionDoc, dataset, observations, queryParameters, defaultOffset, defaultObservationLimit), nil
+		// TODO UsageNodes and UnitsOfMeasure should come from DatasetAPI
+		usageNotes := &[]dataset.UsageNote{}
+		unitsOfMeasure := "usageNotes"
+
+		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, unitsOfMeasure, usageNotes, observations, queryParameters, defaultOffset, defaultObservationLimit), nil
 	}()
 
 	if err != nil {
@@ -183,7 +191,8 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	log.Event(ctx, "get observations endpoint: successfully retrieved observations relative to a selected set of dimension options for a version", log.INFO, logData)
 }
 
-func getDimensionOffsetInHeaderRow(headerRow []string) (int, error) {
+// GetDimensionOffsetInHeaderRow splits the first item of the provided headers by '_', and returns the second item as integer
+func GetDimensionOffsetInHeaderRow(headerRow []string) (int, error) {
 	metaData := strings.Split(headerRow[0], "_")
 
 	if len(metaData) < 2 {
@@ -198,7 +207,8 @@ func getDimensionOffsetInHeaderRow(headerRow []string) (int, error) {
 	return dimensionOffset, nil
 }
 
-func getListOfValidDimensionNames(dimensions []models.Dimension) []string {
+// GetListOfValidDimensionNames iterates the provided dimensions and returns an array with their names
+func GetListOfValidDimensionNames(dimensions []dataset.VersionDimension) []string {
 
 	var dimensionNames []string
 	for _, dimension := range dimensions {
@@ -208,7 +218,8 @@ func getListOfValidDimensionNames(dimensions []models.Dimension) []string {
 	return dimensionNames
 }
 
-func extractQueryParameters(urlQuery url.Values, validDimensions []string) (map[string]string, error) {
+// ExtractQueryParameters creates a map of query parameters (options) by dimension from the provided urlQuery if they exist in the validDimensions list
+func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[string]string, error) {
 	queryParameters := make(map[string]string)
 	var incorrectQueryParameters, missingQueryParameters, multivaluedQueryParameters []string
 
@@ -235,11 +246,11 @@ func extractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	}
 
 	if len(incorrectQueryParameters) > 0 {
-		return nil, errorIncorrectQueryParameters(incorrectQueryParameters)
+		return nil, ErrorIncorrectQueryParameters(incorrectQueryParameters)
 	}
 
 	if len(multivaluedQueryParameters) > 0 {
-		return nil, errorMultivaluedQueryParameters(multivaluedQueryParameters)
+		return nil, ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
 	}
 
 	// Determine if any dimensions have not been set in request query parameters
@@ -249,13 +260,13 @@ func extractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 				missingQueryParameters = append(missingQueryParameters, validDimension)
 			}
 		}
-		return nil, errorMissingQueryParameters(missingQueryParameters)
+		return nil, ErrorMissingQueryParameters(missingQueryParameters)
 	}
 
 	return queryParameters, nil
 }
 
-func (api *API) getObservationList(ctx context.Context, versionDoc *models.Version, queryParameters map[string]string, limit, dimensionOffset int, logData log.Data) ([]models.Observation, error) {
+func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit, dimensionOffset int, logData log.Data) ([]models.Observation, error) {
 
 	// Build query (observation.Filter type)
 	var dimensionFilters []*observation.Dimension
@@ -341,7 +352,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *models.Versi
 	return observations, nil
 }
 
-func createObservation(versionDoc *models.Version, observationRowArray, headerRowArray []string, dimensionOffset int, wildcardParameter string) models.Observation {
+func createObservation(versionDoc *dataset.Version, observationRowArray, headerRowArray []string, dimensionOffset int, wildcardParameter string) models.Observation {
 	observation := models.Observation{
 		Observation: observationRowArray[0],
 	}
@@ -368,7 +379,7 @@ func createObservation(versionDoc *models.Version, observationRowArray, headerRo
 
 						dimensions[headerRowArray[i]] = &models.DimensionObject{
 							ID:    observationRowArray[i-1],
-							HRef:  versionDimension.HRef + "/codes/" + observationRowArray[i-1],
+							HRef:  versionDimension.URL + "/codes/" + observationRowArray[i-1],
 							Label: observationRowArray[i],
 						}
 

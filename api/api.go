@@ -12,15 +12,19 @@ import (
 
 //API provides a struct to wrap the api around
 type API struct {
-	Router    *mux.Router
-	dataStore store.DataStore
+	Router           *mux.Router
+	dataStore        store.DataStore
+	datasetClient    IDatasetClient
+	serviceAuthToken string
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore store.DataStore) *API {
+func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore store.DataStore, datasetClient IDatasetClient, serviceAuthToken string) *API {
 	api := &API{
-		Router:    r,
-		dataStore: dataStore,
+		Router:           r,
+		dataStore:        dataStore,
+		datasetClient:    datasetClient,
+		serviceAuthToken: serviceAuthToken,
 	}
 
 	r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
