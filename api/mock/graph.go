@@ -7,7 +7,7 @@ import (
 	"context"
 	"github.com/ONSdigital/dp-graph/v2/observation"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
-	"github.com/ONSdigital/dp-observation-api/service"
+	"github.com/ONSdigital/dp-observation-api/api"
 	"sync"
 )
 
@@ -18,15 +18,15 @@ var (
 	lockIGraphMockStreamCSVRows sync.RWMutex
 )
 
-// Ensure, that IGraphMock does implement service.IGraph.
+// Ensure, that IGraphMock does implement api.IGraph.
 // If this is not the case, regenerate this file with moq.
-var _ service.IGraph = &IGraphMock{}
+var _ api.IGraph = &IGraphMock{}
 
-// IGraphMock is a mock implementation of service.IGraph.
+// IGraphMock is a mock implementation of api.IGraph.
 //
 //     func TestSomethingThatUsesIGraph(t *testing.T) {
 //
-//         // make and configure a mocked service.IGraph
+//         // make and configure a mocked api.IGraph
 //         mockedIGraph := &IGraphMock{
 //             CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error {
 // 	               panic("mock out the Checker method")
@@ -42,7 +42,7 @@ var _ service.IGraph = &IGraphMock{}
 //             },
 //         }
 //
-//         // use mockedIGraph in code that requires service.IGraph
+//         // use mockedIGraph in code that requires api.IGraph
 //         // and then make assertions.
 //
 //     }

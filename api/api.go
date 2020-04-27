@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/store"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 )
@@ -13,16 +12,16 @@ import (
 //API provides a struct to wrap the api around
 type API struct {
 	Router           *mux.Router
-	dataStore        store.DataStore
+	graphDB          IGraph
 	datasetClient    IDatasetClient
 	serviceAuthToken string
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, dataStore store.DataStore, datasetClient IDatasetClient, serviceAuthToken string) *API {
+func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, serviceAuthToken string) *API {
 	api := &API{
 		Router:           r,
-		dataStore:        dataStore,
+		graphDB:          graphDB,
 		datasetClient:    datasetClient,
 		serviceAuthToken: serviceAuthToken,
 	}

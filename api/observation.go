@@ -301,7 +301,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 
 	log.Event(ctx, "query object built to retrieve observations from db", log.INFO, logData)
 
-	csvRowReader, err := api.dataStore.Backend.StreamCSVRows(ctx, versionDoc.ID, "", &queryObject, &limit)
+	csvRowReader, err := api.graphDB.StreamCSVRows(ctx, versionDoc.ID, "", &queryObject, &limit)
 	if err != nil {
 		return nil, err
 	}

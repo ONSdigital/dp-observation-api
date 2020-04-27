@@ -12,8 +12,6 @@ import (
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/store"
-	storetest "github.com/ONSdigital/dp-observation-api/store/datastoretest"
 	"github.com/gorilla/mux"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -28,9 +26,9 @@ var (
 
 func TestSetup(t *testing.T) {
 	Convey("Given an API instance", t, func() {
-		storeMock := &storetest.StorerMock{}
+		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(storeMock, dcMock)
+		api := GetAPIWithMocks(graphDBMock, dcMock)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -40,9 +38,9 @@ func TestSetup(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	Convey("Given an API instance", t, func() {
-		storeMock := &storetest.StorerMock{}
+		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(storeMock, dcMock)
+		api := GetAPIWithMocks(graphDBMock, dcMock)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := api.Close(testContext)
@@ -59,12 +57,12 @@ func hasRoute(r *mux.Router, path, method string) bool {
 }
 
 // GetAPIWithMocks also used in other tests
-func GetAPIWithMocks(storeMock store.Storer, dcMock api.IDatasetClient) *api.API {
+func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
 	cfg, err := config.Get()
 	So(err, ShouldBeNil)
-	return api.Setup(testContext, mux.NewRouter(), cfg, store.DataStore{Backend: storeMock}, dcMock, testServiceAuthToken)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, testServiceAuthToken)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {

@@ -6,17 +6,15 @@ import (
 
 	"github.com/ONSdigital/dp-graph/v2/graph"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/mongo"
 	"github.com/ONSdigital/go-ns/server"
-	"github.com/ONSdigital/log.go/log"
 )
 
 // ExternalServiceList holds the initialiser and initialisation state of external services.
 type ExternalServiceList struct {
 	Graph       bool
 	HealthCheck bool
-	MongoDB     bool
 	HTTPServer  bool
 	Init        Initialiser
 }
@@ -26,7 +24,6 @@ func NewServiceList(initialiser Initialiser) *ExternalServiceList {
 	return &ExternalServiceList{
 		Graph:       false,
 		HealthCheck: false,
-		MongoDB:     false,
 		Init:        initialiser,
 	}
 }
@@ -41,18 +38,8 @@ func (e *ExternalServiceList) GetHTTPServer(bindAddr string, router http.Handler
 	return s
 }
 
-// GetMongoDB creates a mongodb client and sets the MongoDB flag to true
-func (e *ExternalServiceList) GetMongoDB(ctx context.Context, cfg *config.Config) (IMongo, error) {
-	mongodb, err := e.Init.DoGetMongoDB(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-	e.MongoDB = true
-	return mongodb, nil
-}
-
 // GetGraphDB creates a graphDB client and sets the Graph flag to true
-func (e *ExternalServiceList) GetGraphDB(ctx context.Context) (IGraph, error) {
+func (e *ExternalServiceList) GetGraphDB(ctx context.Context) (api.IGraph, error) {
 	graphDB, err := e.Init.DoGetGraphDB(ctx)
 	if err != nil {
 		return nil, err
@@ -78,29 +65,8 @@ func (e *Init) DoGetHTTPServer(bindAddr string, router http.Handler) IServer {
 	return s
 }
 
-// DoGetMongoDB returns a mongodb client and dataset mongo object
-func (e *Init) DoGetMongoDB(ctx context.Context, cfg *config.Config) (IMongo, error) {
-	mongodb := &mongo.Mongo{
-		Collection: cfg.MongoConfig.Collection,
-		Database:   cfg.MongoConfig.Database,
-		URI:        cfg.MongoConfig.BindAddr,
-	}
-
-	// Initialise mongoDB sessions and client
-	_, err := mongodb.Init()
-	if err != nil {
-		log.Event(ctx, "failed to initialise mongo", log.ERROR, log.Error(err))
-		return nil, err
-	}
-	log.Event(ctx, "listening to mongo db session", log.INFO, log.Data{
-		"bind_address": cfg.BindAddr,
-	})
-
-	return mongodb, nil
-}
-
 // DoGetGraphDB returns a graphDB
-func (e *Init) DoGetGraphDB(ctx context.Context) (IGraph, error) {
+func (e *Init) DoGetGraphDB(ctx context.Context) (api.IGraph, error) {
 	return graph.New(ctx, graph.Subsets{Observation: true, Instance: true})
 }
 

@@ -6,7 +6,6 @@ import (
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/store"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -20,14 +19,7 @@ type Service struct {
 	api         *api.API
 	serviceList *ExternalServiceList
 	healthCheck IHealthCheck
-	mongodb     IMongo
-	graphDB     IGraph
-}
-
-//ObserverAPIStore is a wrapper which embeds Neo4j Mongo structs which between them satisfy the store.Storer interface.
-type ObserverAPIStore struct {
-	IMongo
-	IGraph
+	graphDB     api.IGraph
 }
 
 // Run the service with its dependencies
@@ -45,13 +37,6 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 	r := mux.NewRouter()
 	s := serviceList.GetHTTPServer(cfg.BindAddr, r)
 
-	// Get mongoDB connection for observation store
-	mongodb, err := serviceList.GetMongoDB(ctx, cfg)
-	if err != nil {
-		log.Event(ctx, "could not obtain mongo session", log.ERROR, log.Error(err))
-		return nil, err
-	}
-
 	// Get graphDB connection for observation store
 	graphDB, err := serviceList.GetGraphDB(ctx)
 	if err != nil {
@@ -59,11 +44,11 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		return nil, err
 	}
 
-	store := store.DataStore{Backend: ObserverAPIStore{mongodb, graphDB}}
+	// Get dataset API client
 	datasetAPICli := dataset.NewAPIClient(cfg.DatasetAPIURL)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, store, datasetAPICli, cfg.ServiceAuthToken)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cfg.ServiceAuthToken)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
@@ -71,7 +56,7 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, mongodb, datasetAPICli); err != nil {
+	if err := registerCheckers(ctx, hc, graphDB, datasetAPICli); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -92,7 +77,6 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		healthCheck: hc,
 		server:      s,
 		serviceList: serviceList,
-		mongodb:     mongodb,
 		graphDB:     graphDB,
 	}, nil
 }
@@ -127,14 +111,6 @@ func (svc *Service) Close(ctx context.Context) error {
 			log.Event(ctx, "error closing API", log.Error(err), log.ERROR)
 		}
 
-		// close mongodb
-		if svc.serviceList.MongoDB {
-			if err := svc.mongodb.Close(ctx); err != nil {
-				log.Event(ctx, "failed to close mongo db session", log.ERROR, log.Error(err))
-				hasShutdownError = true
-			}
-		}
-
 		// close graph database
 		if svc.serviceList.Graph {
 			if err := svc.graphDB.Close(ctx); err != nil {
@@ -164,8 +140,7 @@ func (svc *Service) Close(ctx context.Context) error {
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
 func registerCheckers(ctx context.Context,
 	hc IHealthCheck,
-	graphDB IGraph,
-	mongodb IMongo,
+	graphDB api.IGraph,
 	datasetAPICli api.IDatasetClient) (err error) {
 
 	hasErrors := false
@@ -173,11 +148,6 @@ func registerCheckers(ctx context.Context,
 	if err = hc.AddCheck("Graph DB", graphDB.Checker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for graph db", log.ERROR, log.Error(err))
-	}
-
-	if err = hc.AddCheck("Mongo DB", mongodb.Checker); err != nil {
-		hasErrors = true
-		log.Event(ctx, "error adding check for mongo db", log.ERROR, log.Error(err))
 	}
 
 	if err = hc.AddCheck("Dataset API", datasetAPICli.Checker); err != nil {
