@@ -33,39 +33,39 @@ type DimensionObject struct {
 
 // ObservationLinks represents a link object to list of links relevant to the observation
 type ObservationLinks struct {
-	DatasetMetadata *LinkObject `json:"dataset_metadata,omitempty"`
-	Self            *LinkObject `json:"self,omitempty"`
-	Version         *LinkObject `json:"version,omitempty"`
+	DatasetMetadata *dataset.Link `json:"dataset_metadata,omitempty"`
+	Self            *dataset.Link `json:"self,omitempty"`
+	Version         *dataset.Link `json:"version,omitempty"`
 }
 
 // Option represents an object containing a list of link objects that refer to the
 // code url for that dimension option
 type Option struct {
-	LinkObject *LinkObject `json:"option,omitempty"`
+	LinkObject *dataset.Link `json:"option,omitempty"`
 }
 
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
-func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, dataset dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
+func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, datasetDetails dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
 
 	observationsDoc := &ObservationsDoc{
 		Limit: limit,
 		Links: &ObservationLinks{
-			DatasetMetadata: &LinkObject{
-				HRef: versionDoc.Links.Version.URL + "/metadata",
+			DatasetMetadata: &dataset.Link{
+				URL: versionDoc.Links.Version.URL + "/metadata",
 			},
-			Self: &LinkObject{
-				HRef: versionDoc.Links.Version.URL + "/observations?" + rawQuery,
+			Self: &dataset.Link{
+				URL: versionDoc.Links.Version.URL + "/observations?" + rawQuery,
 			},
-			Version: &LinkObject{
-				HRef: versionDoc.Links.Version.URL,
-				ID:   versionDoc.Links.Version.ID,
+			Version: &dataset.Link{
+				URL: versionDoc.Links.Version.URL,
+				ID:  versionDoc.Links.Version.ID,
 			},
 		},
 		Observations:      observations,
 		Offset:            offset,
 		TotalObservations: len(observations),
-		UnitOfMeasure:     dataset.UnitOfMeasure,
-		UsageNotes:        dataset.UsageNotes,
+		UnitOfMeasure:     datasetDetails.UnitOfMeasure,
+		UsageNotes:        datasetDetails.UsageNotes,
 	}
 
 	var dimensions = make(map[string]Option)
@@ -73,12 +73,12 @@ func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, dataset
 	// add the dimension codes
 	for paramKey, paramValue := range queryParameters {
 		for _, dimension := range versionDoc.Dimensions {
-			var linkObjects []*LinkObject
+			var linkObjects []*dataset.Link
 			if dimension.Name == paramKey && paramValue != wildcard {
 
-				linkObject := &LinkObject{
-					HRef: dimension.URL + "/codes/" + paramValue,
-					ID:   paramValue,
+				linkObject := &dataset.Link{
+					URL: dimension.URL + "/codes/" + paramValue,
+					ID:  paramValue,
 				}
 				linkObjects = append(linkObjects, linkObject)
 				dimensions[paramKey] = Option{

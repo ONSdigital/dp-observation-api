@@ -18,7 +18,6 @@ import (
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/dp-observation-api/models"
 	"github.com/ONSdigital/log.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -91,7 +90,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 							ID:  "1",
 						},
 					},
-					State: models.PublishedState,
+					State: dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -185,7 +184,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 							ID:  "1",
 						},
 					},
-					State: models.PublishedState,
+					State: dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -361,7 +360,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -388,7 +387,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					CSVHeader: []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
-					State:     models.PublishedState,
+					State:     dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -416,7 +415,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					CSVHeader:  []string{"v4"},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -443,7 +442,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension3},
 					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -472,7 +471,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3, dimension4},
 					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography", "age_code", "age"},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -500,7 +499,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -529,7 +528,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
-					State:      models.PublishedState,
+					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -590,7 +589,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 							ID:  "1",
 						},
 					},
-					State: models.PublishedState,
+					State: dataset.StatePublished.String(),
 				}, nil
 			},
 		}
@@ -623,7 +622,7 @@ func TestGetListOfValidDimensionNames(t *testing.T) {
 				Name: "geography",
 			}
 
-			version := &models.Version{
+			version := &dataset.Version{
 				Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 			}
 
@@ -643,8 +642,8 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 	t.Parallel()
 	Convey("Given the version headers are valid", t, func() {
 		Convey("When the version has no metadata headers", func() {
-			version := &models.Version{
-				Headers: []string{
+			version := &dataset.Version{
+				CSVHeader: []string{
 					"v4_0",
 					"time_codelist",
 					"time",
@@ -656,7 +655,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 			}
 
 			Convey("Then getListOfValidDimensionNames func returns the correct number of headers", func() {
-				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.CSVHeader)
 
 				So(err, ShouldBeNil)
 				So(dimensionOffset, ShouldEqual, 0)
@@ -664,8 +663,8 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 		})
 
 		Convey("When the version has metadata headers", func() {
-			version := &models.Version{
-				Headers: []string{
+			version := &dataset.Version{
+				CSVHeader: []string{
 					"V4_2",
 					"data_marking",
 					"confidence_interval",
@@ -675,7 +674,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 			}
 
 			Convey("Then getListOfValidDimensionNames func returns the correct number of headers", func() {
-				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.CSVHeader)
 
 				So(err, ShouldBeNil)
 				So(dimensionOffset, ShouldEqual, 2)
@@ -685,8 +684,8 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 
 	Convey("Given the first value in the header does not have an underscore `_` in value", t, func() {
 		Convey("When the getListOfValidDimensionNames func is called", func() {
-			version := &models.Version{
-				Headers: []string{
+			version := &dataset.Version{
+				CSVHeader: []string{
 					"v4",
 					"time_codelist",
 					"time",
@@ -697,7 +696,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 				},
 			}
 			Convey("Then function returns error, `index out of range`", func() {
-				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.CSVHeader)
 
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldResemble, "index out of range")
@@ -708,8 +707,8 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 
 	Convey("Given the first value in the header does not follow the format `v4_1`", t, func() {
 		Convey("When the getListOfValidDimensionNames func is called", func() {
-			version := &models.Version{
-				Headers: []string{
+			version := &dataset.Version{
+				CSVHeader: []string{
 					"v4_one",
 					"time_codelist",
 					"time",
@@ -720,7 +719,7 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 				},
 			}
 			Convey("Then function returns error, `index out of range`", func() {
-				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.Headers)
+				dimensionOffset, err := api.GetDimensionOffsetInHeaderRow(version.CSVHeader)
 
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldResemble, "strconv.Atoi: parsing \"one\": invalid syntax")
