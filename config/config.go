@@ -12,6 +12,7 @@ type Config struct {
 	ServiceAuthToken           string        `envconfig:"SERVICE_AUTH_TOKEN"`
 	DatasetAPIURL              string        `envconfig:"DATASET_API_URL"`
 	DefaultObservationLimit    int           `envconfig:"DEFAULT_OBSERVATION_LIMIT"`
+	EnablePrivateEndpoints     bool          `envconfig:"ENABLE_PRIVATE_ENDPOINTS"`
 	GracefulShutdownTimeout    time.Duration `envconfig:"GRACEFUL_SHUTDOWN_TIMEOUT"`
 	HealthCheckInterval        time.Duration `envconfig:"HEALTHCHECK_INTERVAL"`
 	HealthCheckCriticalTimeout time.Duration `envconfig:"HEALTHCHECK_CRITICAL_TIMEOUT"`
@@ -31,6 +32,7 @@ func Get() (*Config, error) {
 		ServiceAuthToken:           "",
 		DatasetAPIURL:              "http://localhost:22000",
 		DefaultObservationLimit:    10000,
+		EnablePrivateEndpoints:     false,
 		GracefulShutdownTimeout:    5 * time.Second,
 		HealthCheckInterval:        30 * time.Second,
 		HealthCheckCriticalTimeout: 90 * time.Second,

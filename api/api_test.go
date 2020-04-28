@@ -26,9 +26,11 @@ var (
 
 func TestSetup(t *testing.T) {
 	Convey("Given an API instance", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(graphDBMock, dcMock)
+		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -38,9 +40,11 @@ func TestSetup(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	Convey("Given an API instance", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(graphDBMock, dcMock)
+		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := api.Close(testContext)
@@ -57,11 +61,9 @@ func hasRoute(r *mux.Router, path, method string) bool {
 }
 
 // GetAPIWithMocks also used in other tests
-func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient) *api.API {
+func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient, cfg *config.Config) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
-	cfg, err := config.Get()
-	So(err, ShouldBeNil)
 	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock)
 }
 

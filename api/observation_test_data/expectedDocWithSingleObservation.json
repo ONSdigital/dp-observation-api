@@ -42,7 +42,7 @@
 	"offset": 0,
 	"total_observations": 1,
 	"usage_notes": [{
-		"note": "this marks the obsevation with a special character",
+		"note": "this marks the observation with a special character",
 		"title": "data_marking"
 	}]
 }

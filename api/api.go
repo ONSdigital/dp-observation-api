@@ -32,7 +32,12 @@ func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGrap
 
 func (api *API) authenticate(r *http.Request, logData log.Data) bool {
 	// TODO we should call the authentication/authorisation library here
-	return false
+	var authorised bool
+
+	if api.cfg.EnablePrivateEndpoints {
+		return true
+	}
+	return authorised
 }
 
 func setJSONContentType(w http.ResponseWriter) {

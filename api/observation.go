@@ -58,18 +58,16 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		// TODO implement auth once the auth features are moved to their own library
 		authorised := api.authenticate(r, logData)
 
-		// If request is not authenticated then only access resources of state published
+		// Get dataset from dataset API
+		datasetDoc, err := api.datasetClient.Get(ctx, "", api.cfg.ServiceAuthToken, "", datasetID)
+		if err != nil {
+			log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id} returned an error", log.ERROR, log.Error(err), logData)
+			return nil, err
+		}
+
+		// If not authorised, only published datasets are accessible
 		if !authorised {
-
-			// Get dataset from dataset API
-			datasetDoc, err := api.datasetClient.Get(ctx, "", api.cfg.ServiceAuthToken, "", datasetID)
-			if err != nil {
-				log.Event(ctx, "get observations: dataset api get /datasets/{id} returned an error", log.ERROR, log.Error(err), logData)
-				return nil, err
-			}
-
-			// Check for current sub document state
-			if datasetDoc.State != models.PublishedState {
+			if datasetDoc.State != dataset.StatePublished.String() {
 				logData["dataset_doc"] = datasetDoc
 				log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
 				return nil, errs.ErrDatasetNotFound
@@ -78,27 +76,20 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 
 		// Get Version from dataset API
 		versionDoc, err := api.datasetClient.GetVersion(ctx, "", api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
+		if err != nil {
+			log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id}/editions/{edition}/versions/{version} returned an error", log.ERROR, log.Error(err), logData)
+			return nil, err
+		}
 
-		// this is part of getVersion in dataset api
-		// if err = api.dataStore.Backend.CheckEditionExists(datasetID, edition, state); err != nil {
-		// 	log.Event(ctx, "get observations: failed to find edition for dataset", log.ERROR, log.Error(err), logData)
-		// 	return nil, err
-		// }
+		// If not authorised, only published versions of datasets are accessible
+		if !authorised {
+			if versionDoc.State != dataset.StatePublished.String() {
+				logData["dataset_doc"] = datasetDoc
+				log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+				return nil, errs.ErrDatasetNotFound
+			}
+		}
 
-		// versionDoc, err := api.dataStore.Backend.GetVersion(datasetID, edition, version, state)
-		// if err != nil {
-		// 	log.Event(ctx, "get observations: failed to find version for dataset edition", log.ERROR, log.Error(err), logData)
-		// 	return nil, err
-		// }
-
-		// if err = models.CheckState("version", versionDoc.State); err != nil {
-		// 	logData["state"] = versionDoc.State
-		// 	log.Event(ctx, "get observations: unpublished version has an invalid state", log.ERROR, log.Error(err), logData)
-		// 	return nil, err
-		// }
-
-		// versionDoc is the return from getVersion
-		// if versionDoc.Headers == nil || versionDoc.Dimensions == nil {
 		if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
 			logData["version_doc"] = versionDoc
 			log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionHeadersOrDimensions), logData)
@@ -130,11 +121,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// TODO UsageNodes and UnitsOfMeasure should come from DatasetAPI
-		usageNotes := &[]dataset.UsageNote{}
-		unitsOfMeasure := "usageNotes"
-
-		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, unitsOfMeasure, usageNotes, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
+		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
 	}()
 
 	if err != nil {

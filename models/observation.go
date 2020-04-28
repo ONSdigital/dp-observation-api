@@ -45,7 +45,7 @@ type Option struct {
 }
 
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
-func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, unitOfMeasure string, usageNotes *[]dataset.UsageNote, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
+func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, dataset dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
 
 	observationsDoc := &ObservationsDoc{
 		Limit: limit,
@@ -64,8 +64,8 @@ func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, unitOfM
 		Observations:      observations,
 		Offset:            offset,
 		TotalObservations: len(observations),
-		UnitOfMeasure:     unitOfMeasure, // TODO dataset api should return this?
-		UsageNotes:        usageNotes,    // TODO dataset api should return this?
+		UnitOfMeasure:     dataset.UnitOfMeasure,
+		UsageNotes:        dataset.UsageNotes,
 	}
 
 	var dimensions = make(map[string]Option)

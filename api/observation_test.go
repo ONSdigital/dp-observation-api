@@ -17,8 +17,8 @@ import (
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
+	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/models"
-	storetest "github.com/ONSdigital/dp-observation-api/store/datastoretest"
 	"github.com/ONSdigital/log.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -37,20 +37,20 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 	Convey("Given a request to get a single observation for a version of a dataset returns 200 OK response", t, func() {
 
 		dimensions := []dataset.VersionDimension{
-			dataset.VersionDimension{
+			{
 				Name: "aggregate",
 				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "geography",
 				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "time",
 				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
-		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the obsevation with a special character"}}
+		usagesNotes := &[]dataset.UsageNote{{Title: "data_marking", Note: "this marks the observation with a special character"}}
 
 		count := 0
 		mockRowReader := &observationtest.StreamRowReaderMock{
@@ -68,36 +68,37 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(string) (*models.DatasetUpdate, error) {
-				ret := &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}
-				return ret, nil
-			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(string, string, string, string) (*models.Version, error) {
-				return &models.Version{
-					Dimensions: dimensions,
-					Headers:    []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
-					Links: &models.VersionLinks{
-						Version: &models.LinkObject{
-							HRef: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
-							ID:   "1",
-						},
-					},
-					State:      models.PublishedState,
-					UsageNotes: usagesNotes,
-				}, nil
-			},
-			StreamCSVRowsFunc: func(context.Context, string, string, *observation.DimensionFilters, *int) (observation.StreamRowReader, error) {
+		graphDbMock := &mock.IGraphMock{
+			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
 				return mockRowReader, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{
+					State:      dataset.StatePublished.String(),
+					UsageNotes: usagesNotes,
+				}, nil
+			},
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
+					Dimensions: dimensions,
+					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
+					Links: dataset.Links{
+						Version: dataset.Link{
+							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
+							ID:  "1",
+						},
+					},
+					State: models.PublishedState,
+				}, nil
+			},
+		}
 
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(graphDbMock, dcMock, cfg)
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
@@ -107,10 +108,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithSingleObservation"))
 
-			So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(dcMock.GetCalls()), ShouldEqual, 1)
+			So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
+			So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
 		})
 
@@ -122,10 +122,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedSecondDocWithSingleObservation"))
 
-			So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-			So(len(mockedDataStore.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(dcMock.GetCalls()), ShouldEqual, 1)
+			So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
+			So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
 		})
 
@@ -136,20 +135,20 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		dimensions := []dataset.VersionDimension{
-			dataset.VersionDimension{
+			{
 				Name: "aggregate",
 				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "geography",
 				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "time",
 				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
-		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the observation with a special character"}}
+		usagesNotes := &[]dataset.UsageNote{{Title: "data_marking", Note: "this marks the observation with a special character"}}
 
 		count := 0
 		mockRowReader := &observationtest.StreamRowReaderMock{
@@ -169,412 +168,389 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
-			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(string, string, string, string) (*models.Version, error) {
-				return &models.Version{
-					Dimensions: dimensions,
-					Headers:    []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
-					Links: &models.VersionLinks{
-						Version: &models.LinkObject{
-							HRef: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
-							ID:   "1",
-						},
-					},
-					State:      models.PublishedState,
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{
+					State:      dataset.StatePublished.String(),
 					UsageNotes: usagesNotes,
 				}, nil
 			},
-			StreamCSVRowsFunc: func(context.Context, string, string, *observation.DimensionFilters, *int) (observation.StreamRowReader, error) {
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
+					Dimensions: dimensions,
+					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
+					Links: dataset.Links{
+						Version: dataset.Link{
+							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
+							ID:  "1",
+						},
+					},
+					State: models.PublishedState,
+				}, nil
+			},
+		}
+
+		graphDbMock := &mock.IGraphMock{
+			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
 				return mockRowReader, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(graphDbMock, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
 		So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithMultipleObservations"))
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.StreamCSVRowsCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
+		So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 		So(len(mockRowReader.ReadCalls()), ShouldEqual, 4)
 	})
 }
 
 func TestGetObservationsReturnsError(t *testing.T) {
 	t.Parallel()
-	Convey("When the api cannot connect to mongo datastore return an internal server error", t, func() {
+	Convey("When the api cannot connect to dataset api return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return nil, errs.ErrInternalServer
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{}, errs.ErrInternalServer
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		So(w.Body.String(), ShouldResemble, "internal error\n")
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 0)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When the dataset does not exist return status not found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return nil, errs.ErrDatasetNotFound
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 0)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
 	})
 
-	Convey("When the dataset exists but is unpublished return status not found", t, func() {
+	Convey("When the dataset version does not exist return status not found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
+			},
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{}, errs.ErrDatasetNotFound
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 0)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
-	Convey("When the edition of a dataset does not exist return status not found", t, func() {
+	Convey("When the dataset exists but is unpublished return status not found for unauthorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
-			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return errs.ErrEditionNotFound
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StateCreated.String()}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
-		So(w.Body.String(), ShouldContainSubstring, errs.ErrEditionNotFound.Error())
+		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
 	})
 
-	Convey("When version does not exist for an edition of a dataset returns status not found", t, func() {
+	Convey("When an unpublished version has an incorrect state for an edition of a dataset return not found error for unauthorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return nil, errs.ErrVersionNotFound
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{State: "gobbly-gook"}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
-		So(w.Code, ShouldEqual, http.StatusNotFound)
-		So(w.Body.String(), ShouldContainSubstring, errs.ErrVersionNotFound.Error())
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(w.Code, ShouldEqual, http.StatusNotFound)
+		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
+
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
-	Convey("When an unpublished version has an incorrect state for an edition of a dataset return an internal error", t, func() {
+	Convey("When an unpublished version has an incorrect state return an internal error for authorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StateCreated.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{State: "gobbly-gook"}, nil
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{State: "gobbly-gook"}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		cfg.EnablePrivateEndpoints = true
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When a version document has not got a headers field return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When a version document has not got any dimensions field return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
-					Headers: []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
-					State:   models.PublishedState,
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
+					CSVHeader: []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
+					State:     models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When the first header in array does not describe the header row correctly return internal error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
-					Headers:    []string{"v4"},
+					CSVHeader:  []string{"v4"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When an invalid query parameter is set in request return 400 bad request with an error message containing a list of incorrect query parameters", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension3},
-					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
+					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "incorrect selection of query parameters: [geography], these dimensions do not exist for this version of the dataset\n")
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When there is a missing query parameter that is expected to be set in request return 400 bad request with an error message containing a list of missing query parameters", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3, dimension4},
-					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography", "age_code", "age"},
+					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography", "age_code", "age"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
-
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "missing query parameters for the following dimensions: [age]\n")
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When there are too many query parameters that are set to wildcard (*) value request returns 400 bad request", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=*&aggregate=*&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
-					Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
+					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
 					State:      models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "only one wildcard (*) is allowed as a value in selected query parameters\n")
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When requested query does not find a unique observation return no observations found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		w := httptest.NewRecorder()
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(datasetID string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{State: dataset.StatePublished.String()}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
+					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
+					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
+					State:      models.PublishedState,
+				}, nil
 			},
-			GetVersionFunc: func(datasetID, editionID, version, state string) (*models.Version, error) {
-				return &models.Version{
-						Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
-						Headers:    []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
-						State:      models.PublishedState,
-					},
-					nil
-			},
+		}
+
+		graphDBMock := &mock.IGraphMock{
 			StreamCSVRowsFunc: func(context.Context, string, string, *observation.DimensionFilters, *int) (observation.StreamRowReader, error) {
 				return nil, errs.ErrObservationsNotFound
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrObservationsNotFound.Error())
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.StreamCSVRowsCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetCalls()), ShouldEqual, 1)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When requested query has a multi-valued dimension return bad request", t, func() {
@@ -582,56 +558,52 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		dimensions := []dataset.VersionDimension{
-			dataset.VersionDimension{
+			{
 				Name: "aggregate",
 				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "geography",
 				URL:  "http://localhost:8081/code-lists/uk-only",
 			},
-			dataset.VersionDimension{
+			{
 				Name: "time",
 				URL:  "http://localhost:8081/code-lists/time",
 			},
 		}
-		usagesNotes := &[]models.UsageNote{models.UsageNote{Title: "data_marking", Note: "this marks the obsevation with a special character"}}
+		usagesNotes := &[]dataset.UsageNote{{Title: "data_marking", Note: "this marks the observation with a special character"}}
 
-		mockedDataStore := &storetest.StorerMock{
-			GetDatasetFunc: func(string) (*models.DatasetUpdate, error) {
-				return &models.DatasetUpdate{Current: &models.Dataset{State: models.PublishedState}}, nil
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{
+					State:      dataset.StatePublished.String(),
+					UsageNotes: usagesNotes,
+				}, nil
 			},
-			CheckEditionExistsFunc: func(datasetID, editionID, state string) error {
-				return nil
-			},
-			GetVersionFunc: func(string, string, string, string) (*models.Version, error) {
-				return &models.Version{
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
 					Dimensions: dimensions,
-					Headers:    []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
-					Links: &models.VersionLinks{
-						Version: &models.LinkObject{
-							HRef: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
-							ID:   "1",
+					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
+					Links: dataset.Links{
+						Version: dataset.Link{
+							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
+							ID:  "1",
 						},
 					},
-					State:      models.PublishedState,
-					UsageNotes: usagesNotes,
+					State: models.PublishedState,
 				}, nil
 			},
 		}
 
-		dcMock := &mock.IDatasetClientMock{}
-
-		api := GetAPIWithMocks(mockedDataStore, dcMock)
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "multi-valued query parameters for the following dimensions: [geography]\n")
 
-		So(len(mockedDataStore.GetDatasetCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.CheckEditionExistsCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.GetVersionCalls()), ShouldEqual, 1)
-		So(len(mockedDataStore.StreamCSVRowsCalls()), ShouldEqual, 0)
+		So(len(dcMock.GetVersionCalls()), ShouldEqual, 1)
 	})
 }
 
@@ -794,7 +766,7 @@ func TestExtractQueryParameters(t *testing.T) {
 			Convey("Then extractQueryParameters func returns an error", func() {
 				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, api.ErrorMissingQueryParameters([]string{"aggregate"}))
+				So(err, ShouldResemble, errs.ErrorMissingQueryParameters([]string{"aggregate"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})
@@ -809,7 +781,7 @@ func TestExtractQueryParameters(t *testing.T) {
 			Convey("Then extractQueryParameters func returns an error", func() {
 				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, api.ErrorIncorrectQueryParameters([]string{"age"}))
+				So(err, ShouldResemble, errs.ErrorIncorrectQueryParameters([]string{"age"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})
@@ -824,7 +796,7 @@ func TestExtractQueryParameters(t *testing.T) {
 			Convey("Then extractQueryParameters func returns an error", func() {
 				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
 				So(err, ShouldNotBeNil)
-				So(err, ShouldResemble, api.ErrorMultivaluedQueryParameters([]string{"time"}))
+				So(err, ShouldResemble, errs.ErrorMultivaluedQueryParameters([]string{"time"}))
 				So(queryParameters, ShouldBeNil)
 			})
 		})
