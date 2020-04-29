@@ -23,17 +23,17 @@ var (
 
 func main() {
 	log.Namespace = serviceName
+	ctx := context.Background()
 
-	if err := run(); err != nil {
-		log.Event(nil, "fatal runtime error", log.Error(err), log.FATAL)
+	if err := run(ctx); err != nil {
+		log.Event(ctx, "fatal runtime error", log.Error(err), log.FATAL)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(ctx context.Context) error {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, os.Kill)
-	ctx := context.Background()
 
 	// Run the service, providing an error channel for fatal errors
 	svcErrors := make(chan error, 1)

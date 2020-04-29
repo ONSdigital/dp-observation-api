@@ -95,18 +95,8 @@ paths:
           $ref: '#/responses/InternalError'
 
 responses:
-  ConflictError:
-    description: "Failed to process the request due to a conflict"
-  ForbiddenError:
-    description: "The request is forbidden"
-  InstanceNotFound:
-    description: "The instance was not found"
   InternalError:
     description: "Failed to process the request due to an internal error"
-  InvalidRequestError:
-    description: "Failed to process the request due to invalid request"
-  UnauthorisedError:
-    description: "The token provided is unauthorised to carry out this operation"
 
 definitions:
   ObservationsEndpoint:

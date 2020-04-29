@@ -12,12 +12,16 @@ import (
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/config"
+	"github.com/ONSdigital/go-ns/common"
 	"github.com/gorilla/mux"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 const testServiceAuthToken = "testServiceAuthToken"
+const testUserAuthToken = "testUserAuthToken"
+
+var ctx = context.WithValue(context.Background(), common.FlorenceIdentityKey, testUserAuthToken)
 
 var (
 	mu          sync.Mutex
@@ -64,6 +68,7 @@ func hasRoute(r *mux.Router, path, method string) bool {
 func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient, cfg *config.Config) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
+	cfg.ServiceAuthToken = testServiceAuthToken
 	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock)
 }
 

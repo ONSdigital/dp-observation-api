@@ -44,7 +44,7 @@ func setJSONContentType(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 }
 
-// Close closes any API dependencies
+// Close is called during graceful shutdown to give the API an opportunity to perform any required disposal task
 func (*API) Close(ctx context.Context) error {
 	log.Event(ctx, "graceful shutdown of api complete", log.INFO)
 	return nil

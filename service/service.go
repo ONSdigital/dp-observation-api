@@ -106,7 +106,7 @@ func (svc *Service) Close(ctx context.Context) error {
 			}
 		}
 
-		// close any API dependency
+		// close API
 		if err := svc.api.Close(ctx); err != nil {
 			log.Event(ctx, "error closing API", log.Error(err), log.ERROR)
 		}

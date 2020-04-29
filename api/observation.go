@@ -15,6 +15,7 @@ import (
 	"github.com/ONSdigital/dp-observation-api/apierrors"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
+	"github.com/ONSdigital/go-ns/common"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -57,9 +58,10 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 
 		// TODO implement auth once the auth features are moved to their own library
 		authorised := api.authenticate(r, logData)
+		userAuthToken := getUserAuthToken(r.Context())
 
 		// Get dataset from dataset API
-		datasetDoc, err := api.datasetClient.Get(ctx, "", api.cfg.ServiceAuthToken, "", datasetID)
+		datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
 		if err != nil {
 			log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id} returned an error", log.ERROR, log.Error(err), logData)
 			return nil, err
@@ -75,18 +77,18 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get Version from dataset API
-		versionDoc, err := api.datasetClient.GetVersion(ctx, "", api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
+		versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
 		if err != nil {
-			log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id}/editions/{edition}/versions/{version} returned an error", log.ERROR, log.Error(err), logData)
+			log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
 			return nil, err
 		}
 
 		// If not authorised, only published versions of datasets are accessible
 		if !authorised {
 			if versionDoc.State != dataset.StatePublished.String() {
-				logData["dataset_doc"] = datasetDoc
-				log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
-				return nil, errs.ErrDatasetNotFound
+				logData["version_doc"] = datasetDoc
+				log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+				return nil, errs.ErrVersionNotFound
 			}
 		}
 
@@ -221,6 +223,16 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	}
 
 	return queryParameters, nil
+}
+
+// getUserAuthToken obtains the user auth token from the contet, expected under FlorenceIdentityKet
+func getUserAuthToken(ctx context.Context) string {
+
+	if common.IsFlorenceIdentityPresent(ctx) {
+		return ctx.Value(common.FlorenceIdentityKey).(string)
+	}
+
+	return ""
 }
 
 func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit, dimensionOffset int, logData log.Data) ([]models.Observation, error) {
