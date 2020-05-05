@@ -86,7 +86,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		// If not authorised, only published versions of datasets are accessible
 		if !authorised {
 			if versionDoc.State != dataset.StatePublished.String() {
-				logData["version_doc"] = datasetDoc
+				logData["version_doc"] = versionDoc
 				log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
 				return nil, errs.ErrVersionNotFound
 			}
