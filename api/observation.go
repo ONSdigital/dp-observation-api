@@ -52,80 +52,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	// TODO call audit (attempt) once it has its own library
 	logData := log.Data{"dataset_id": datasetID, "edition": edition, "version": version}
 
-	// TODO call dataset API getVersion via dp-api-clients-go:
-
-	observationsDoc, err := func() (*models.ObservationsDoc, error) {
-
-		// TODO implement auth once the auth features are moved to their own library
-		authorised := api.authenticate(r, logData)
-		userAuthToken := getUserAuthToken(r.Context())
-
-		// Get dataset from dataset API
-		datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
-		if err != nil {
-			log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id} returned an error", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
-
-		// If not authorised, only published datasets are accessible
-		if !authorised {
-			if datasetDoc.State != dataset.StatePublished.String() {
-				logData["dataset_doc"] = datasetDoc
-				log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
-				return nil, errs.ErrDatasetNotFound
-			}
-		}
-
-		// Get Version from dataset API
-		versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
-		if err != nil {
-			log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
-
-		// If not authorised, only published versions of datasets are accessible
-		if !authorised {
-			if versionDoc.State != dataset.StatePublished.String() {
-				logData["version_doc"] = versionDoc
-				log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
-				return nil, errs.ErrVersionNotFound
-			}
-		}
-
-		if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
-			logData["version_doc"] = versionDoc
-			log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionHeadersOrDimensions), logData)
-			return nil, errs.ErrMissingVersionHeadersOrDimensions
-		}
-
-		// loop through version dimensions to retrieve list of dimension names
-		validDimensionNames := GetListOfValidDimensionNames(versionDoc.Dimensions)
-		logData["version_dimensions"] = validDimensionNames
-
-		dimensionOffset, err := GetDimensionOffsetInHeaderRow(versionDoc.CSVHeader)
-		if err != nil {
-			log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
-
-		// check query parameters match the version headers
-		queryParameters, err := ExtractQueryParameters(r.URL.Query(), validDimensionNames)
-		if err != nil {
-			log.Event(ctx, "get observations: error extracting query parameters", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
-		logData["query_parameters"] = queryParameters
-
-		// retrieve observations
-		observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, dimensionOffset, logData)
-		if err != nil {
-			log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
-			return nil, err
-		}
-
-		return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
-	}()
-
+	observationsDoc, err := api.doGetObservations(ctx, datasetID, edition, version, r, logData)
 	if err != nil {
 		// TODO call audit (unsuccessful) once it has its own library
 		handleObservationsErrorType(ctx, w, err, logData)
@@ -148,6 +75,78 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Event(ctx, "get observations endpoint: successfully retrieved observations relative to a selected set of dimension options for a version", log.INFO, logData)
+}
+
+func (api *API) doGetObservations(ctx context.Context, datasetID, edition, version string, r *http.Request, logData log.Data) (*models.ObservationsDoc, error) {
+
+	// TODO implement auth once the auth features are moved to their own library
+	authorised := api.authenticate(r, logData)
+	userAuthToken := getUserAuthToken(r.Context())
+
+	// Get dataset from dataset API
+	datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
+	if err != nil {
+		log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id} returned an error", log.ERROR, log.Error(err), logData)
+		return nil, err
+	}
+
+	// If not authorised, only published datasets are accessible
+	if !authorised {
+		if datasetDoc.State != dataset.StatePublished.String() {
+			logData["dataset_doc"] = datasetDoc
+			log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			return nil, errs.ErrDatasetNotFound
+		}
+	}
+
+	// Get Version from dataset API
+	versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
+	if err != nil {
+		log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
+		return nil, err
+	}
+
+	// If not authorised, only published versions of datasets are accessible
+	if !authorised {
+		if versionDoc.State != dataset.StatePublished.String() {
+			logData["version_doc"] = versionDoc
+			log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			return nil, errs.ErrVersionNotFound
+		}
+	}
+
+	if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
+		logData["version_doc"] = versionDoc
+		log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionHeadersOrDimensions), logData)
+		return nil, errs.ErrMissingVersionHeadersOrDimensions
+	}
+
+	// loop through version dimensions to retrieve list of dimension names
+	validDimensionNames := GetListOfValidDimensionNames(versionDoc.Dimensions)
+	logData["version_dimensions"] = validDimensionNames
+
+	dimensionOffset, err := GetDimensionOffsetInHeaderRow(versionDoc.CSVHeader)
+	if err != nil {
+		log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
+		return nil, err
+	}
+
+	// check query parameters match the version headers
+	queryParameters, err := ExtractQueryParameters(r.URL.Query(), validDimensionNames)
+	if err != nil {
+		log.Event(ctx, "get observations: error extracting query parameters", log.ERROR, log.Error(err), logData)
+		return nil, err
+	}
+	logData["query_parameters"] = queryParameters
+
+	// retrieve observations
+	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, dimensionOffset, logData)
+	if err != nil {
+		log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
+		return nil, err
+	}
+
+	return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
 }
 
 // GetDimensionOffsetInHeaderRow splits the first item of the provided headers by '_', and returns the second item as integer
