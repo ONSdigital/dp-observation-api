@@ -83,36 +83,14 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	authorised := api.authenticate(r, logData)
 	userAuthToken := getUserAuthToken(r.Context())
 
-	// Get dataset from dataset API
-	datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
+	datasetDoc, err := api.getDataset(ctx, authorised, userAuthToken, datasetID, logData)
 	if err != nil {
-		log.Event(ctx, "get observations: dataset api get /datasets/{dataset_id} returned an error", log.ERROR, log.Error(err), logData)
 		return nil, err
 	}
 
-	// If not authorised, only published datasets are accessible
-	if !authorised {
-		if datasetDoc.State != dataset.StatePublished.String() {
-			logData["dataset_doc"] = datasetDoc
-			log.Event(ctx, "get observations: found no published dataset", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
-			return nil, errs.ErrDatasetNotFound
-		}
-	}
-
-	// Get Version from dataset API
-	versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
+	versionDoc, err := api.getVersion(ctx, authorised, userAuthToken, datasetID, edition, version, logData)
 	if err != nil {
-		log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
 		return nil, err
-	}
-
-	// If not authorised, only published versions of datasets are accessible
-	if !authorised {
-		if versionDoc.State != dataset.StatePublished.String() {
-			logData["version_doc"] = versionDoc
-			log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
-			return nil, errs.ErrVersionNotFound
-		}
 	}
 
 	if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
@@ -165,6 +143,45 @@ func GetDimensionOffsetInHeaderRow(headerRow []string) (int, error) {
 	return dimensionOffset, nil
 }
 
+// getDataset obtains the Dataset document from Dataset API and validates that it is published if the caller is unauthorised to see unpublished datasets.
+func (api *API) getDataset(ctx context.Context, authorised bool, userAuthToken, datasetID string, logData log.Data) (dataset.DatasetDetails, error) {
+	// Get dataset from dataset API
+	datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
+	if err != nil {
+		log.Event(ctx, "get observations: dataset api failed to retrieve dataset document", log.ERROR, log.Error(err), logData)
+		return dataset.DatasetDetails{}, err
+	}
+
+	// If not authorised, only published datasets are accessible
+	if !authorised {
+		if datasetDoc.State != dataset.StatePublished.String() {
+			logData["dataset_doc"] = datasetDoc
+			log.Event(ctx, "get observations: dataset is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
+		}
+	}
+	return datasetDoc, nil
+}
+
+func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, datasetID, edition, version string, logData log.Data) (dataset.Version, error) {
+	// Get Version from dataset API
+	versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
+	if err != nil {
+		log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
+		return dataset.Version{}, err
+	}
+
+	// If not authorised, only published versions of datasets are accessible
+	if !authorised {
+		if versionDoc.State != dataset.StatePublished.String() {
+			logData["version_doc"] = versionDoc
+			log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			return dataset.Version{}, errs.ErrVersionNotFound
+		}
+	}
+	return versionDoc, err
+}
+
 // GetListOfValidDimensionNames iterates the provided dimensions and returns an array with their names
 func GetListOfValidDimensionNames(dimensions []dataset.VersionDimension) []string {
 
@@ -181,6 +198,12 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	queryParameters := make(map[string]string)
 	var incorrectQueryParameters, missingQueryParameters, multivaluedQueryParameters []string
 
+	// Map for efficiency
+	validDimensionsMap := make(map[string]struct{})
+	for _, validDimension := range validDimensions {
+		validDimensionsMap[validDimension] = struct{}{}
+	}
+
 	// Determine if any request query parameters are invalid dimensions
 	// and map the valid dimensions with their equivalent values in map
 	for rawDimension, option := range urlQuery {
@@ -188,14 +211,12 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 		dimension := strings.ToLower(rawDimension)
 
 		queryParamExists := false
-		for _, validDimension := range validDimensions {
-			if dimension == validDimension {
-				queryParamExists = true
-				queryParameters[dimension] = option[0]
-				if len(option) != 1 {
-					multivaluedQueryParameters = append(multivaluedQueryParameters, rawDimension)
-				}
-				break
+
+		if _, dimFound := validDimensionsMap[dimension]; dimFound {
+			queryParamExists = true
+			queryParameters[dimension] = option[0]
+			if len(option) != 1 {
+				multivaluedQueryParameters = append(multivaluedQueryParameters, rawDimension)
 			}
 		}
 		if !queryParamExists {
@@ -273,13 +294,12 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 	if err != nil {
 		return nil, err
 	}
+	defer csvRowReader.Close(ctx)
 
 	headerRow, err := csvRowReader.Read()
 	if err != nil {
 		return nil, err
 	}
-
-	defer csvRowReader.Close(ctx)
 
 	headerRowReader := csv.NewReader(strings.NewReader(headerRow))
 	headerRowArray, err := headerRowReader.Read()
