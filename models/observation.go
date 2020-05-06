@@ -70,21 +70,24 @@ func CreateObservationsDoc(rawQuery string, versionDoc *dataset.Version, dataset
 
 	var dimensions = make(map[string]Option)
 
+	versionDocDimensions := make(map[string]dataset.VersionDimension)
+	for _, dim := range versionDoc.Dimensions {
+		versionDocDimensions[dim.Name] = dim
+	}
+
 	// add the dimension codes
 	for paramKey, paramValue := range queryParameters {
-		for _, dimension := range versionDoc.Dimensions {
+		dimension, found := versionDocDimensions[paramKey]
+		if found && paramValue != wildcard {
 			var linkObjects []*dataset.Link
-			if dimension.Name == paramKey && paramValue != wildcard {
 
-				linkObject := &dataset.Link{
-					URL: dimension.URL + "/codes/" + paramValue,
-					ID:  paramValue,
-				}
-				linkObjects = append(linkObjects, linkObject)
-				dimensions[paramKey] = Option{
-					LinkObject: linkObject,
-				}
-				break
+			linkObject := &dataset.Link{
+				URL: dimension.URL + "/codes/" + paramValue,
+				ID:  paramValue,
+			}
+			linkObjects = append(linkObjects, linkObject)
+			dimensions[paramKey] = Option{
+				LinkObject: linkObject,
 			}
 		}
 	}

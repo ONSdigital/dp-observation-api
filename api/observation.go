@@ -356,25 +356,25 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 		observation.Metadata = observationMetaData
 	}
 
+	versionDocDimensions := make(map[string]dataset.VersionDimension)
+	for _, dim := range versionDoc.Dimensions {
+		versionDocDimensions[dim.Name] = dim
+	}
+
 	if wildcardParameter != "" {
 		dimensions := make(map[string]*models.DimensionObject)
 
 		for i := dimensionOffset + 2; i < len(observationRowArray); i += 2 {
 
 			if strings.ToLower(headerRowArray[i]) == wildcardParameter {
-				for _, versionDimension := range versionDoc.Dimensions {
-					if versionDimension.Name == wildcardParameter {
-
-						dimensions[headerRowArray[i]] = &models.DimensionObject{
-							ID:    observationRowArray[i-1],
-							HRef:  versionDimension.URL + "/codes/" + observationRowArray[i-1],
-							Label: observationRowArray[i],
-						}
-
-						break
+				versionDimension, found := versionDocDimensions[wildcardParameter]
+				if found {
+					dimensions[headerRowArray[i]] = &models.DimensionObject{
+						ID:    observationRowArray[i-1],
+						HRef:  versionDimension.URL + "/codes/" + observationRowArray[i-1],
+						Label: observationRowArray[i],
 					}
 				}
-
 				break
 			}
 		}
