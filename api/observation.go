@@ -21,8 +21,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Upper limit, if this is not big enough, we may need to consider increasing value
-// and then if this has a performance hit then consider paging
 const (
 	defaultOffset = 0
 
@@ -85,6 +83,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	datasetDoc, err := api.getDataset(ctx, authorised, userAuthToken, datasetID, logData)
 	if err != nil {
+		log.Event(ctx, "failed to retrieve dataset doc", log.ERROR, log.Error(err))
 		return nil, err
 	}
 
@@ -93,23 +92,17 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 		return nil, err
 	}
 
-	if versionDoc.CSVHeader == nil || versionDoc.Dimensions == nil {
+	if versionDoc.Dimensions == nil {
 		logData["version_doc"] = versionDoc
-		log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionHeadersOrDimensions), logData)
-		return nil, errs.ErrMissingVersionHeadersOrDimensions
+		log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionDimensions), logData)
+		return nil, errs.ErrMissingVersionDimensions
 	}
 
 	// loop through version dimensions to retrieve list of dimension names
 	validDimensionNames := GetListOfValidDimensionNames(versionDoc.Dimensions)
 	logData["version_dimensions"] = validDimensionNames
 
-	dimensionOffset, err := GetDimensionOffsetInHeaderRow(versionDoc.CSVHeader)
-	if err != nil {
-		log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
-		return nil, err
-	}
-
-	// check query parameters match the version headers
+	// check query parameters match the version dimensions
 	queryParameters, err := ExtractQueryParameters(r.URL.Query(), validDimensionNames)
 	if err != nil {
 		log.Event(ctx, "get observations: error extracting query parameters", log.ERROR, log.Error(err), logData)
@@ -118,13 +111,13 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	logData["query_parameters"] = queryParameters
 
 	// retrieve observations
-	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, dimensionOffset, logData)
+	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData)
 	if err != nil {
 		log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
 		return nil, err
 	}
 
-	return models.CreateObservationsDoc(r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
+	return models.CreateObservationsDoc(api.cfg.ObservationAPIURL, r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
 }
 
 // GetDimensionOffsetInHeaderRow splits the first item of the provided headers by '_', and returns the second item as integer
@@ -245,7 +238,7 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	return queryParameters, nil
 }
 
-// getUserAuthToken obtains the user auth token from the contet, expected under FlorenceIdentityKet
+// getUserAuthToken obtains the user auth token from the context, expected under FlorenceIdentityKey
 func getUserAuthToken(ctx context.Context) string {
 
 	if common.IsFlorenceIdentityPresent(ctx) {
@@ -255,7 +248,7 @@ func getUserAuthToken(ctx context.Context) string {
 	return ""
 }
 
-func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit, dimensionOffset int, logData log.Data) ([]models.Observation, error) {
+func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data) ([]models.Observation, error) {
 
 	// Build query (observation.Filter type)
 	var dimensionFilters []*observation.Dimension
@@ -304,6 +297,12 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 	headerRowReader := csv.NewReader(strings.NewReader(headerRow))
 	headerRowArray, err := headerRowReader.Read()
 	if err != nil {
+		return nil, err
+	}
+
+	dimensionOffset, err := GetDimensionOffsetInHeaderRow(headerRowArray)
+	if err != nil {
+		log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
 		return nil, err
 	}
 
