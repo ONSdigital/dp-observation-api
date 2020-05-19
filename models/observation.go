@@ -47,6 +47,8 @@ type Option struct {
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
 func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Version, datasetDetails dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
 
+	selfLink := generateSelfURL(obsAPIURL, rawQuery, versionDoc)
+
 	observationsDoc := &ObservationsDoc{
 		Limit: limit,
 		Links: &ObservationLinks{
@@ -54,7 +56,7 @@ func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Versi
 				URL: versionDoc.Links.Version.URL + "/metadata",
 			},
 			Self: &dataset.Link{
-				URL: obsAPIURL + "/observations?" + rawQuery,
+				URL: selfLink,
 			},
 			Version: &dataset.Link{
 				URL: versionDoc.Links.Version.URL,
@@ -94,4 +96,9 @@ func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Versi
 	observationsDoc.Dimensions = dimensions
 
 	return observationsDoc
+}
+
+func generateSelfURL(obsAPIURL, rawQuery string, versionDoc *dataset.Version) string {
+	return obsAPIURL + "/datasets/" + versionDoc.Links.Dataset.ID + "/editions/" +
+		versionDoc.Links.Edition.ID + "/versions/" + versionDoc.Links.Version.ID + "/observations?" + rawQuery
 }

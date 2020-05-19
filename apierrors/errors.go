@@ -15,7 +15,9 @@ var (
 	ErrMissingVersionDimensions = errors.New("missing list of dimensions from version doc")
 	ErrIndexOutOfRange          = errors.New("index out of range")
 	ErrInternalServer           = errors.New("internal error")
+	ErrUnauthorised             = errors.New("unauthorised")
 	ErrResourceState            = errors.New("incorrect resource state")
+	ErrInvalidDocType           = errors.New("incorrect document type")
 )
 
 // ObservationQueryError is an error structure to handle observation query errors

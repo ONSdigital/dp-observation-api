@@ -4,39 +4,58 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-observation-api/config"
+	"github.com/ONSdigital/go-ns/common"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
 )
 
 //API provides a struct to wrap the api around
 type API struct {
+	cfg           *config.Config
 	Router        *mux.Router
 	graphDB       IGraph
 	datasetClient IDatasetClient
-	cfg           *config.Config
+	permissions   IAuthHandler
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient) *API {
+func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, permissions IAuthHandler) *API {
 	api := &API{
+		cfg:           cfg,
 		Router:        r,
 		graphDB:       graphDB,
 		datasetClient: datasetClient,
-		cfg:           cfg,
+		permissions:   permissions,
 	}
 
-	r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
+	if api.cfg.EnablePrivateEndpoints {
+		read := auth.Permissions{Read: true}
+		r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", permissions.Require(read, api.getObservations)).Methods(http.MethodGet)
+	} else {
+		r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
+	}
+
 	return api
 }
 
-func (api *API) authenticate(r *http.Request, logData log.Data) bool {
-	// TODO we should call the authentication/authorisation library here
-	var authorised bool
+func (api *API) checkIfAuthorised(r *http.Request, logData log.Data) (authorised bool) {
 
-	if api.cfg.EnablePrivateEndpoints {
-		return true
+	callerIdentity := common.Caller(r.Context())
+	if callerIdentity != "" {
+		logData["caller_identity"] = callerIdentity
+		authorised = true
 	}
+
+	userIdentity := common.User(r.Context())
+	if userIdentity != "" {
+		logData["user_identity"] = userIdentity
+		authorised = true
+	}
+
+	logData["authenticated"] = authorised
+
 	return authorised
 }
 

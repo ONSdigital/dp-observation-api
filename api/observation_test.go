@@ -12,8 +12,9 @@ import (
 	"testing"
 
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
+	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-graph/v2/observation"
-	observationtest "github.com/ONSdigital/dp-graph/v2/observation/observationtest"
+	"github.com/ONSdigital/dp-graph/v2/observation/observationtest"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
@@ -67,7 +68,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		graphDbMock := &mock.IGraphMock{
+		graphDBMock := &mock.IGraphMock{
 			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
 				return mockRowReader, nil
 			},
@@ -83,8 +84,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: dimensions,
-					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
 					Links: dataset.Links{
+						Dataset: dataset.Link{ID: "cpih012"},
+						Edition: dataset.Link{ID: "2017"},
 						Version: dataset.Link{
 							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
 							ID:  "1",
@@ -97,10 +99,12 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(graphDbMock, dcMock, cfg)
+
+		cfg.ObservationAPIURL = "http://localhost:8082"
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
-			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 			r = r.WithContext(context.WithValue(r.Context(), common.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
 			api.Router.ServeHTTP(w, r)
@@ -110,7 +114,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 			validateGetDataset(dcMock, "cpih012")
 			validateGetVersion(dcMock, "cpih012", "2017", "1")
-			So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
 		})
 
@@ -125,10 +129,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 			validateGetDataset(dcMock, "cpih012")
 			validateGetVersion(dcMock, "cpih012", "2017", "1")
-			So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
 		})
-
 	})
 
 	Convey("A successful request to get multiple observations via a wildcard for a version of a dataset returns 200 OK response", t, func() {
@@ -180,8 +183,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: dimensions,
-					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
 					Links: dataset.Links{
+						Dataset: dataset.Link{ID: "cpih012"},
+						Edition: dataset.Link{ID: "2017"},
 						Version: dataset.Link{
 							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
 							ID:  "1",
@@ -192,7 +196,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
-		graphDbMock := &mock.IGraphMock{
+		graphDBMock := &mock.IGraphMock{
 			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
 				return mockRowReader, nil
 			},
@@ -200,7 +204,10 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(graphDbMock, dcMock, cfg)
+
+		cfg.ObservationAPIURL = "http://localhost:8082"
+
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
@@ -208,7 +215,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		validateGetDataset(dcMock, "cpih012")
 		validateGetVersion(dcMock, "cpih012", "2017", "1")
-		So(len(graphDbMock.StreamCSVRowsCalls()), ShouldEqual, 1)
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 		So(len(mockRowReader.ReadCalls()), ShouldEqual, 4)
 	})
 }
@@ -228,7 +235,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -250,7 +257,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -275,7 +283,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -298,7 +307,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -323,7 +332,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -347,10 +357,20 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		pMock := &mock.IAuthHandlerMock{
+			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
+				r = r.WithContext(context.WithValue(r.Context(), common.UserIdentityKey, testUserAuthToken))
+				return func(w http.ResponseWriter, r *http.Request) {
+					handler.ServeHTTP(w, r)
+				}
+			},
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		cfg.EnablePrivateEndpoints = true
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, pMock)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -358,10 +378,25 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		validateGetVersion(dcMock, "cpih012", "2017", "1")
 	})
 
-	Convey("When a version document has not got a headers field return an internal server error", t, func() {
+	Convey("When graph instance node has not got a headers field return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		r = r.WithContext(context.WithValue(r.Context(), common.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
+
+		mockRowReader := &observationtest.StreamRowReaderMock{
+			ReadFunc: func() (string, error) {
+				return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+			},
+			CloseFunc: func(context.Context) error {
+				return nil
+			},
+		}
+
+		graphDBMock := &mock.IGraphMock{
+			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
+				return mockRowReader, nil
+			},
+		}
 
 		dcMock := &mock.IDatasetClientMock{
 			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
@@ -377,13 +412,14 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
 		validateGetDataset(dcMock, "cpih012")
 		validateGetVersion(dcMock, "cpih012", "2017", "1")
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When a version document has not got any dimensions field return an internal server error", t, func() {
@@ -397,15 +433,14 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
-					CSVHeader: []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
-					State:     dataset.StatePublished.String(),
+					State: dataset.StatePublished.String(),
 				}, nil
 			},
 		}
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -418,6 +453,21 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		r = r.WithContext(context.WithValue(r.Context(), common.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
+
+		mockRowReader := &observationtest.StreamRowReaderMock{
+			ReadFunc: func() (string, error) {
+				return "v4,data_marking,confidence_interval,time,time,geography_code,geography,aggregate_code,aggregate", nil
+			},
+			CloseFunc: func(context.Context) error {
+				return nil
+			},
+		}
+
+		graphDBMock := &mock.IGraphMock{
+			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
+				return mockRowReader, nil
+			},
+		}
 
 		dcMock := &mock.IDatasetClientMock{
 			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
@@ -434,12 +484,13 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
 		validateGetDataset(dcMock, "cpih012")
 		validateGetVersion(dcMock, "cpih012", "2017", "1")
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 	})
 
 	Convey("When an invalid query parameter is set in request return 400 bad request with an error message containing a list of incorrect query parameters", t, func() {
@@ -454,7 +505,6 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension3},
-					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate"},
 					State:      dataset.StatePublished.String(),
 				}, nil
 			},
@@ -462,7 +512,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -484,14 +534,13 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3, dimension4},
-					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography", "age_code", "age"},
 					State:      dataset.StatePublished.String(),
 				}, nil
 			},
 		}
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -521,7 +570,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -543,7 +592,6 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: []dataset.VersionDimension{dimension1, dimension2, dimension3},
-					CSVHeader:  []string{"v4_0", "time_code", "time", "aggregate_code", "aggregate", "geography_code", "geography"},
 					State:      dataset.StatePublished.String(),
 				}, nil
 			},
@@ -557,7 +605,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -599,7 +647,6 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 				return dataset.Version{
 					Dimensions: dimensions,
-					CSVHeader:  []string{"v4_2", "data_marking", "confidence_interval", "aggregate_code", "aggregate", "geography_code", "geography", "time", "time"},
 					Links: dataset.Links{
 						Version: dataset.Link{
 							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
@@ -613,7 +660,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(&mock.IGraphMock{}, dcMock, cfg)
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -622,7 +670,6 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		validateGetDataset(dcMock, "cpih012")
 		validateGetVersion(dcMock, "cpih012", "2017", "1")
 	})
-
 }
 
 func TestGetListOfValidDimensionNames(t *testing.T) {

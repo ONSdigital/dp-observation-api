@@ -77,8 +77,11 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 
 func (api *API) doGetObservations(ctx context.Context, datasetID, edition, version string, r *http.Request, logData log.Data) (*models.ObservationsDoc, error) {
 
-	// TODO implement auth once the auth features are moved to their own library
-	authorised := api.authenticate(r, logData)
+	var authorised bool
+	if api.cfg.EnablePrivateEndpoints {
+		authorised = api.checkIfAuthorised(r, logData)
+	}
+
 	userAuthToken := getUserAuthToken(r.Context())
 
 	datasetDoc, err := api.getDataset(ctx, authorised, userAuthToken, datasetID, logData)
@@ -89,6 +92,12 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	versionDoc, err := api.getVersion(ctx, authorised, userAuthToken, datasetID, edition, version, logData)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = models.CheckState(models.Version, versionDoc.State); err != nil {
+		logData["state"] = versionDoc.State
+		log.Event(ctx, "get observations: unpublished version has an invalid state", log.ERROR, log.Error(err), logData)
 		return nil, err
 	}
 
@@ -142,17 +151,31 @@ func (api *API) getDataset(ctx context.Context, authorised bool, userAuthToken, 
 	datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
 	if err != nil {
 		log.Event(ctx, "get observations: dataset api failed to retrieve dataset document", log.ERROR, log.Error(err), logData)
-		return dataset.DatasetDetails{}, err
+
+		datasetError, ok := err.(*dataset.ErrInvalidDatasetAPIResponse)
+		if !ok {
+			return dataset.DatasetDetails{}, err
+		}
+
+		switch datasetError.Code() {
+		case http.StatusUnauthorized:
+			return dataset.DatasetDetails{}, errs.ErrUnauthorised
+		case http.StatusNotFound:
+			return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
+		default:
+			return dataset.DatasetDetails{}, errs.ErrInternalServer
+		}
 	}
 
 	// If not authorised, only published datasets are accessible
 	if !authorised {
 		if datasetDoc.State != dataset.StatePublished.String() {
-			logData["dataset_doc"] = datasetDoc
+			// logData["dataset_doc"] = datasetDoc
 			log.Event(ctx, "get observations: dataset is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
 			return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
 		}
 	}
+
 	return datasetDoc, nil
 }
 
@@ -161,7 +184,20 @@ func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, 
 	versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
 	if err != nil {
 		log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
-		return dataset.Version{}, err
+
+		datasetError, ok := err.(*dataset.ErrInvalidDatasetAPIResponse)
+		if !ok {
+			return dataset.Version{}, err
+		}
+
+		switch datasetError.Code() {
+		case http.StatusUnauthorized:
+			return dataset.Version{}, errs.ErrUnauthorised
+		case http.StatusNotFound:
+			return dataset.Version{}, errs.ErrVersionNotFound
+		default:
+			return dataset.Version{}, errs.ErrInternalServer
+		}
 	}
 
 	// If not authorised, only published versions of datasets are accessible
@@ -383,7 +419,9 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 }
 
 func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err error, data log.Data) {
+
 	_, isObservationErr := err.(apierrors.ObservationQueryError)
+
 	var status int
 
 	switch {

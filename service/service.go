@@ -4,6 +4,9 @@ import (
 	"context"
 
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
+	"github.com/ONSdigital/dp-api-clients-go/zebedee"
+	"github.com/ONSdigital/dp-authorisation/auth"
+	rchttp "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/log.go/log"
@@ -23,14 +26,9 @@ type Service struct {
 }
 
 // Run the service with its dependencies
-func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
+func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceList, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
 	log.Event(ctx, "running service", log.INFO)
 
-	// Read config
-	cfg, err := config.Get()
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to retrieve service configuration")
-	}
 	log.Event(ctx, "got service configuration", log.Data{"config": cfg}, log.INFO)
 
 	// Get HTTP Server
@@ -44,11 +42,14 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		return nil, err
 	}
 
+	// Get zebedee client
+	zebedeeCli := zebedee.New(cfg.ZebedeeURL)
+
 	// Get dataset API client
 	datasetAPICli := dataset.NewAPIClient(cfg.DatasetAPIURL)
 
-	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli)
+	// Get permissions for private endpoints
+	permissions := getAuthorisationHandler(ctx, *cfg)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
@@ -56,12 +57,15 @@ func Run(ctx context.Context, serviceList *ExternalServiceList, buildTime, gitCo
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, datasetAPICli); err != nil {
+	if err := registerCheckers(ctx, hc, graphDB, zebedeeCli, datasetAPICli, cfg.EnablePrivateEndpoints); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
 	r.StrictSlash(true).Path("/health").HandlerFunc(hc.Handler)
 	hc.Start(ctx)
+
+	// Setup the API
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, permissions)
 
 	// Run the http server in a new go-routine
 	go func() {
@@ -137,13 +141,40 @@ func (svc *Service) Close(ctx context.Context) error {
 	return nil
 }
 
+// getAuthorisationHandler retrieves auth handler to authorise request
+func getAuthorisationHandler(ctx context.Context, cfg config.Config) api.IAuthHandler {
+	if !cfg.EnablePrivateEndpoints {
+		log.Event(ctx, "feature flag to not enable private endpoints, nop auth impl", log.INFO, log.Data{"feature": "ENABLE_PRIVATE_ENDPOINTS"})
+		return &auth.NopHandler{}
+	}
+
+	log.Event(ctx, "feature flag enabled", log.INFO, log.Data{"feature": "ENABLE_PERMISSIONS_AUTH"})
+	auth.LoggerNamespace("dp-observation-api-auth")
+
+	// for checking caller permissions when we only have a user/service token
+	return auth.NewHandler(
+		auth.NewDatasetPermissionsRequestBuilder(cfg.ZebedeeURL, "dataset_id", mux.Vars),
+		auth.NewPermissionsClient(rchttp.NewClient()),
+		auth.DefaultPermissionsVerifier(),
+	)
+}
+
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
 func registerCheckers(ctx context.Context,
 	hc IHealthCheck,
 	graphDB api.IGraph,
-	datasetAPICli api.IDatasetClient) (err error) {
+	zebedeeCli *zebedee.Client,
+	datasetAPICli api.IDatasetClient,
+	enablePrivateEndpoints bool) (err error) {
 
 	hasErrors := false
+
+	if enablePrivateEndpoints {
+		if err = hc.AddCheck("Zebedee", zebedeeCli.Checker); err != nil {
+			hasErrors = true
+			log.Event(ctx, "error adding check for zebedee", log.ERROR, log.Error(err))
+		}
+	}
 
 	if err = hc.AddCheck("Graph DB", graphDB.Checker); err != nil {
 		hasErrors = true

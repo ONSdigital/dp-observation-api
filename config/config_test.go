@@ -23,6 +23,8 @@ func TestConfig(t *testing.T) {
 					ServiceAuthToken:           "",
 					DatasetAPIURL:              "http://localhost:22000",
 					ObservationAPIURL:          "http://localhost:24500",
+					ZebedeeURL:                 "http://localhost:8082",
+					EnablePrivateEndpoints:     false,
 					DefaultObservationLimit:    10000,
 					GracefulShutdownTimeout:    5 * time.Second,
 					HealthCheckInterval:        30 * time.Second,
