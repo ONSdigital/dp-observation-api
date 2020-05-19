@@ -170,7 +170,7 @@ func (api *API) getDataset(ctx context.Context, authorised bool, userAuthToken, 
 	// If not authorised, only published datasets are accessible
 	if !authorised {
 		if datasetDoc.State != dataset.StatePublished.String() {
-			// logData["dataset_doc"] = datasetDoc
+			logData["dataset_doc"] = datasetDoc
 			log.Event(ctx, "get observations: dataset is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
 			return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
 		}
