@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
@@ -29,12 +30,32 @@ var (
 )
 
 func TestSetup(t *testing.T) {
-	Convey("Given an API instance", t, func() {
+	Convey("Given a public API instance", t, func() {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
+		pMock := &auth.NopHandler{}
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
+
+		Convey("When created the following routes should have been added", func() {
+			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
+		})
+	})
+
+	Convey("Given a private API instance", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		graphDBMock := &mock.IGraphMock{}
+		dcMock := &mock.IDatasetClientMock{}
+		pMock := &mock.IAuthHandlerMock{
+			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
+				return func(w http.ResponseWriter, r *http.Request) {
+					handler.ServeHTTP(w, r)
+				}
+			},
+		}
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -48,7 +69,8 @@ func TestClose(t *testing.T) {
 		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
-		api := GetAPIWithMocks(graphDBMock, dcMock, cfg)
+		pMock := &auth.NopHandler{}
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := api.Close(testContext)
@@ -65,11 +87,11 @@ func hasRoute(r *mux.Router, path, method string) bool {
 }
 
 // GetAPIWithMocks also used in other tests
-func GetAPIWithMocks(graphDBMock api.IGraph, dcMock api.IDatasetClient, cfg *config.Config) *api.API {
+func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDatasetClient, pMock api.IAuthHandler) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
 	cfg.ServiceAuthToken = testServiceAuthToken
-	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, pMock)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {

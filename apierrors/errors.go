@@ -7,15 +7,17 @@ import (
 
 // A list of error messages for Observation API
 var (
-	ErrDatasetNotFound                   = errors.New("dataset not found")
-	ErrEditionNotFound                   = errors.New("edition not found")
-	ErrVersionNotFound                   = errors.New("version not found")
-	ErrObservationsNotFound              = errors.New("no observations found")
-	ErrTooManyWildcards                  = errors.New("only one wildcard (*) is allowed as a value in selected query parameters")
-	ErrMissingVersionHeadersOrDimensions = errors.New("missing headers or dimensions or both from version doc")
-	ErrIndexOutOfRange                   = errors.New("index out of range")
-	ErrInternalServer                    = errors.New("internal error")
-	ErrResourceState                     = errors.New("incorrect resource state")
+	ErrDatasetNotFound          = errors.New("dataset not found")
+	ErrEditionNotFound          = errors.New("edition not found")
+	ErrVersionNotFound          = errors.New("version not found")
+	ErrObservationsNotFound     = errors.New("no observations found")
+	ErrTooManyWildcards         = errors.New("only one wildcard (*) is allowed as a value in selected query parameters")
+	ErrMissingVersionDimensions = errors.New("missing list of dimensions from version doc")
+	ErrIndexOutOfRange          = errors.New("index out of range")
+	ErrInternalServer           = errors.New("internal error")
+	ErrUnauthorised             = errors.New("unauthorised")
+	ErrResourceState            = errors.New("incorrect resource state")
+	ErrInvalidDocType           = errors.New("incorrect document type")
 )
 
 // ObservationQueryError is an error structure to handle observation query errors

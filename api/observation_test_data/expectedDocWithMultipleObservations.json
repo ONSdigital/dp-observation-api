@@ -19,7 +19,7 @@
 			"href": "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/metadata"
 		},
 		"self": {
-			"href": "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001"
+			"href": "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001"
 		},
 		"version": {
 			"href": "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",

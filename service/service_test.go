@@ -41,9 +41,13 @@ var funcDoGetHTTPServerNil = func(bindAddr string, router http.Handler) service.
 	return nil
 }
 
-func TestRun(t *testing.T) {
+func TestRunPrivate(t *testing.T) {
 
 	Convey("Having a set of mocked dependencies", t, func() {
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		cfg.EnablePrivateEndpoints = true
 
 		graphDbMock := &apiMock.IGraphMock{
 			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
@@ -77,7 +81,8 @@ func TestRun(t *testing.T) {
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			_, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run fails with the same error and the flag is not set", func() {
 				So(err, ShouldResemble, errGraph)
@@ -94,7 +99,8 @@ func TestRun(t *testing.T) {
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			_, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run fails with the same error and the flag is not set", func() {
 				So(err, ShouldResemble, errHealthcheck)
@@ -112,7 +118,140 @@ func TestRun(t *testing.T) {
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			_, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			Convey("Then service Run succeeds and all the flags are set", func() {
+				So(err, ShouldBeNil)
+				So(svcList.Graph, ShouldBeTrue)
+				So(svcList.HealthCheck, ShouldBeTrue)
+			})
+
+			Convey("The checkers are registered and the healthcheck and http server started", func() {
+				So(len(hcMock.AddCheckCalls()), ShouldEqual, 3)
+				So(hcMock.AddCheckCalls()[0].Name, ShouldResemble, "Zebedee")
+				So(hcMock.AddCheckCalls()[1].Name, ShouldResemble, "Graph DB")
+				So(hcMock.AddCheckCalls()[2].Name, ShouldResemble, "Dataset API")
+				So(len(initMock.DoGetHTTPServerCalls()), ShouldEqual, 1)
+				So(initMock.DoGetHTTPServerCalls()[0].BindAddr, ShouldEqual, ":24500")
+				So(len(hcMock.StartCalls()), ShouldEqual, 1)
+				So(len(serverMock.ListenAndServeCalls()), ShouldEqual, 1)
+			})
+		})
+
+		Convey("Given that Checkers cannot be registered", func() {
+
+			errAddheckFail := errors.New("Error(s) registering checkers for healthcheck")
+			hcMockAddFail := &serviceMock.IHealthCheckMock{
+				AddCheckFunc: func(name string, checker healthcheck.Checker) error { return errAddheckFail },
+				StartFunc:    func(ctx context.Context) {},
+			}
+
+			initMock := &serviceMock.InitialiserMock{
+				DoGetHTTPServerFunc: funcDoGetHTTPServerNil,
+				DoGetGraphDBFunc:    funcDoGetGraphDbOk,
+				DoGetHealthCheckFunc: func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
+					return hcMockAddFail, nil
+				},
+			}
+			svcErrors := make(chan error, 1)
+			svcList := service.NewServiceList(initMock)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			Convey("Then service Run fails, but all checks try to register", func() {
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldResemble, fmt.Sprintf("unable to register checkers: %s", errAddheckFail.Error()))
+				So(svcList.Graph, ShouldBeTrue)
+				So(svcList.HealthCheck, ShouldBeTrue)
+				So(len(hcMockAddFail.AddCheckCalls()), ShouldEqual, 3)
+				So(hcMockAddFail.AddCheckCalls()[0].Name, ShouldResemble, "Zebedee")
+				So(hcMockAddFail.AddCheckCalls()[1].Name, ShouldResemble, "Graph DB")
+				So(hcMockAddFail.AddCheckCalls()[2].Name, ShouldResemble, "Dataset API")
+			})
+		})
+	})
+}
+
+func TestRunPublic(t *testing.T) {
+
+	Convey("Having a set of mocked dependencies", t, func() {
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		cfg.EnablePrivateEndpoints = false
+
+		graphDbMock := &apiMock.IGraphMock{
+			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+		}
+
+		hcMock := &serviceMock.IHealthCheckMock{
+			AddCheckFunc: func(name string, checker healthcheck.Checker) error { return nil },
+			StartFunc:    func(ctx context.Context) {},
+		}
+
+		serverMock := &serviceMock.IServerMock{
+			ListenAndServeFunc: func() error { return nil },
+		}
+
+		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, error) {
+			return graphDbMock, nil
+		}
+
+		funcDoGetHealthcheckOk := func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
+			return hcMock, nil
+		}
+
+		funcDoGetHTTPServer := func(bindAddr string, router http.Handler) service.IServer {
+			return serverMock
+		}
+
+		Convey("Given that initialising graphDB returns an error", func() {
+			initMock := &serviceMock.InitialiserMock{
+				DoGetHTTPServerFunc: funcDoGetHTTPServerNil,
+				DoGetGraphDBFunc:    funcDoGetGraphDbErr,
+			}
+			svcErrors := make(chan error, 1)
+			svcList := service.NewServiceList(initMock)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			Convey("Then service Run fails with the same error and the flag is not set", func() {
+				So(err, ShouldResemble, errGraph)
+				So(svcList.Graph, ShouldBeFalse)
+				So(svcList.HealthCheck, ShouldBeFalse)
+			})
+		})
+
+		Convey("Given that initialising healthcheck returns an error", func() {
+			initMock := &serviceMock.InitialiserMock{
+				DoGetHTTPServerFunc:  funcDoGetHTTPServerNil,
+				DoGetGraphDBFunc:     funcDoGetGraphDbOk,
+				DoGetHealthCheckFunc: funcDoGetHealthcheckErr,
+			}
+			svcErrors := make(chan error, 1)
+			svcList := service.NewServiceList(initMock)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			Convey("Then service Run fails with the same error and the flag is not set", func() {
+				So(err, ShouldResemble, errHealthcheck)
+				So(svcList.Graph, ShouldBeTrue)
+				So(svcList.HealthCheck, ShouldBeFalse)
+			})
+		})
+
+		Convey("Given that all dependencies are successfully initialised", func() {
+
+			initMock := &serviceMock.InitialiserMock{
+				DoGetHTTPServerFunc:  funcDoGetHTTPServer,
+				DoGetGraphDBFunc:     funcDoGetGraphDbOk,
+				DoGetHealthCheckFunc: funcDoGetHealthcheckOk,
+			}
+			svcErrors := make(chan error, 1)
+			svcList := service.NewServiceList(initMock)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run succeeds and all the flags are set", func() {
 				So(err, ShouldBeNil)
@@ -148,7 +287,8 @@ func TestRun(t *testing.T) {
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			_, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+
+			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run fails, but all checks try to register", func() {
 				So(err, ShouldNotBeNil)
@@ -166,6 +306,9 @@ func TestRun(t *testing.T) {
 func TestClose(t *testing.T) {
 
 	Convey("Having a correctly initialised service", t, func() {
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
 
 		hcStopped := false
 		serverStopped := false
@@ -212,7 +355,7 @@ func TestClose(t *testing.T) {
 
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			svc, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+			svc, err := service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 			So(err, ShouldBeNil)
 
 			err = svc.Close(context.Background())
@@ -241,7 +384,7 @@ func TestClose(t *testing.T) {
 
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
-			svc, err := service.Run(ctx, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
+			svc, err := service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 			So(err, ShouldBeNil)
 
 			err = svc.Close(context.Background())

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/service"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/pkg/errors"
@@ -38,7 +39,15 @@ func run(ctx context.Context) error {
 	// Run the service, providing an error channel for fatal errors
 	svcErrors := make(chan error, 1)
 	svcList := service.NewServiceList(&service.Init{})
-	svc, err := service.Run(ctx, svcList, BuildTime, GitCommit, Version, svcErrors)
+
+	// Read config
+	cfg, err := config.Get()
+	if err != nil {
+		return errors.Wrap(err, "unable to retrieve service configuration")
+	}
+	log.Event(ctx, "got service configuration", log.Data{"config": cfg}, log.INFO)
+
+	svc, err := service.Run(ctx, cfg, svcList, BuildTime, GitCommit, Version, svcErrors)
 	if err != nil {
 		return errors.Wrap(err, "running service failed")
 	}
