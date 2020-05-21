@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
@@ -58,8 +59,12 @@ func TestRunPrivate(t *testing.T) {
 			StartFunc:    func(ctx context.Context) {},
 		}
 
+		serverWg := &sync.WaitGroup{}
 		serverMock := &serviceMock.IServerMock{
-			ListenAndServeFunc: func() error { return nil },
+			ListenAndServeFunc: func() error {
+				serverWg.Done()
+				return nil
+			},
 		}
 
 		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, error) {
@@ -119,6 +124,7 @@ func TestRunPrivate(t *testing.T) {
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
 
+			serverWg.Add(1)
 			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run succeeds and all the flags are set", func() {
@@ -135,6 +141,7 @@ func TestRunPrivate(t *testing.T) {
 				So(len(initMock.DoGetHTTPServerCalls()), ShouldEqual, 1)
 				So(initMock.DoGetHTTPServerCalls()[0].BindAddr, ShouldEqual, ":24500")
 				So(len(hcMock.StartCalls()), ShouldEqual, 1)
+				serverWg.Wait() // Wait for HTTP server go-routine to finish
 				So(len(serverMock.ListenAndServeCalls()), ShouldEqual, 1)
 			})
 		})
@@ -190,8 +197,12 @@ func TestRunPublic(t *testing.T) {
 			StartFunc:    func(ctx context.Context) {},
 		}
 
+		serverWg := &sync.WaitGroup{}
 		serverMock := &serviceMock.IServerMock{
-			ListenAndServeFunc: func() error { return nil },
+			ListenAndServeFunc: func() error {
+				serverWg.Done()
+				return nil
+			},
 		}
 
 		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, error) {
@@ -251,6 +262,7 @@ func TestRunPublic(t *testing.T) {
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
 
+			serverWg.Add(1)
 			_, err = service.Run(ctx, cfg, svcList, testBuildTime, testGitCommit, testVersion, svcErrors)
 
 			Convey("Then service Run succeeds and all the flags are set", func() {
@@ -266,6 +278,7 @@ func TestRunPublic(t *testing.T) {
 				So(len(initMock.DoGetHTTPServerCalls()), ShouldEqual, 1)
 				So(initMock.DoGetHTTPServerCalls()[0].BindAddr, ShouldEqual, ":24500")
 				So(len(hcMock.StartCalls()), ShouldEqual, 1)
+				serverWg.Wait() // Wait for HTTP server go-routine to finish
 				So(len(serverMock.ListenAndServeCalls()), ShouldEqual, 1)
 			})
 		})
