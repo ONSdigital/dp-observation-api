@@ -6,9 +6,9 @@ import (
 
 	"github.com/ONSdigital/dp-graph/v2/graph"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/go-ns/server"
 )
 
 // ExternalServiceList holds the initialiser and initialisation state of external services.
@@ -60,7 +60,7 @@ func (e *ExternalServiceList) GetHealthCheck(cfg *config.Config, buildTime, gitC
 
 // DoGetHTTPServer creates an HTTP Server with the provided bind address and router
 func (e *Init) DoGetHTTPServer(bindAddr string, router http.Handler) IServer {
-	s := server.New(bindAddr, router)
+	s := dpHTTP.NewServer(bindAddr, router)
 	s.HandleOSSignals = false
 	return s
 }
