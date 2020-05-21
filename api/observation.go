@@ -97,13 +97,13 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	if err = models.CheckState(models.Version, versionDoc.State); err != nil {
 		logData["state"] = versionDoc.State
-		log.Event(ctx, "get observations: unpublished version has an invalid state", log.ERROR, log.Error(err), logData)
+		log.Event(ctx, "get observations: version has an invalid state", log.ERROR, log.Error(err), logData)
 		return nil, err
 	}
 
 	if versionDoc.Dimensions == nil {
 		logData["version_doc"] = versionDoc
-		log.Event(ctx, "get observations", log.ERROR, log.Error(errs.ErrMissingVersionDimensions), logData)
+		log.Event(ctx, "get observations: missing dimensions in versio doc", log.ERROR, log.Error(errs.ErrMissingVersionDimensions), logData)
 		return nil, errs.ErrMissingVersionDimensions
 	}
 
