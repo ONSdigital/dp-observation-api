@@ -39,13 +39,13 @@ func (e *ExternalServiceList) GetHTTPServer(bindAddr string, router http.Handler
 }
 
 // GetGraphDB creates a graphDB client and sets the Graph flag to true
-func (e *ExternalServiceList) GetGraphDB(ctx context.Context) (api.IGraph, error) {
-	graphDB, err := e.Init.DoGetGraphDB(ctx)
+func (e *ExternalServiceList) GetGraphDB(ctx context.Context) (api.IGraph, Closer, error) {
+	graphDB, graphDBErrorConsumer, err := e.Init.DoGetGraphDB(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	e.Graph = true
-	return graphDB, nil
+	return graphDB, graphDBErrorConsumer, nil
 }
 
 // GetHealthCheck creates a healthcheck with versionInfo and sets teh HealthCheck flag to true
@@ -66,8 +66,15 @@ func (e *Init) DoGetHTTPServer(bindAddr string, router http.Handler) IServer {
 }
 
 // DoGetGraphDB returns a graphDB
-func (e *Init) DoGetGraphDB(ctx context.Context) (api.IGraph, error) {
-	return graph.New(ctx, graph.Subsets{Observation: true, Instance: true})
+func (e *Init) DoGetGraphDB(ctx context.Context) (api.IGraph, Closer, error) {
+	graphDB, err := graph.New(ctx, graph.Subsets{Observation: true, Instance: true})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	graphErrorConsumer := graph.NewLoggingErrorConsumer(ctx, graphDB.ErrorChan())
+
+	return graphDB, graphErrorConsumer, nil
 }
 
 // DoGetHealthCheck creates a healthcheck with versionInfo

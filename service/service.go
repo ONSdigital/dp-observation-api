@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-api-clients-go/zebedee"
 	"github.com/ONSdigital/dp-authorisation/auth"
@@ -16,13 +15,14 @@ import (
 
 // Service contains all the configs, server and clients to run the observation API
 type Service struct {
-	config      *config.Config
-	server      IServer
-	router      *mux.Router
-	api         *api.API
-	serviceList *ExternalServiceList
-	healthCheck IHealthCheck
-	graphDB     api.IGraph
+	config             *config.Config
+	server             IServer
+	router             *mux.Router
+	api                *api.API
+	serviceList        *ExternalServiceList
+	healthCheck        IHealthCheck
+	graphDB            api.IGraph
+	graphErrorConsumer Closer
 }
 
 // Run the service with its dependencies
@@ -36,7 +36,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	s := serviceList.GetHTTPServer(cfg.BindAddr, r)
 
 	// Get graphDB connection for observation store
-	graphDB, err := serviceList.GetGraphDB(ctx)
+	graphDB, graphErrorConsumer, err := serviceList.GetGraphDB(ctx)
 	if err != nil {
 		log.Event(ctx, "failed to initialise graph driver", log.FATAL, log.Error(err))
 		return nil, err
@@ -75,13 +75,14 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	}()
 
 	return &Service{
-		config:      cfg,
-		router:      r,
-		api:         a,
-		healthCheck: hc,
-		server:      s,
-		serviceList: serviceList,
-		graphDB:     graphDB,
+		config:             cfg,
+		router:             r,
+		api:                a,
+		healthCheck:        hc,
+		server:             s,
+		serviceList:        serviceList,
+		graphDB:            graphDB,
+		graphErrorConsumer: graphErrorConsumer,
 	}, nil
 }
 
@@ -119,6 +120,11 @@ func (svc *Service) Close(ctx context.Context) error {
 		if svc.serviceList.Graph {
 			if err := svc.graphDB.Close(ctx); err != nil {
 				log.Event(ctx, "failed to close graph db", log.ERROR, log.Error(err))
+				hasShutdownError = true
+			}
+
+			if err := svc.graphErrorConsumer.Close(ctx); err != nil {
+				log.Event(ctx, "failed to close graph db error consumer", log.ERROR, log.Error(err))
 				hasShutdownError = true
 			}
 		}

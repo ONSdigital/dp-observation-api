@@ -12,12 +12,6 @@ import (
 	"sync"
 )
 
-var (
-	lockInitialiserMockDoGetGraphDB     sync.RWMutex
-	lockInitialiserMockDoGetHTTPServer  sync.RWMutex
-	lockInitialiserMockDoGetHealthCheck sync.RWMutex
-)
-
 // Ensure, that InitialiserMock does implement service.Initialiser.
 // If this is not the case, regenerate this file with moq.
 var _ service.Initialiser = &InitialiserMock{}
@@ -28,7 +22,7 @@ var _ service.Initialiser = &InitialiserMock{}
 //
 //         // make and configure a mocked service.Initialiser
 //         mockedInitialiser := &InitialiserMock{
-//             DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, error) {
+//             DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
 // 	               panic("mock out the DoGetGraphDB method")
 //             },
 //             DoGetHTTPServerFunc: func(bindAddr string, router http.Handler) service.IServer {
@@ -45,7 +39,7 @@ var _ service.Initialiser = &InitialiserMock{}
 //     }
 type InitialiserMock struct {
 	// DoGetGraphDBFunc mocks the DoGetGraphDB method.
-	DoGetGraphDBFunc func(ctx context.Context) (api.IGraph, error)
+	DoGetGraphDBFunc func(ctx context.Context) (api.IGraph, service.Closer, error)
 
 	// DoGetHTTPServerFunc mocks the DoGetHTTPServer method.
 	DoGetHTTPServerFunc func(bindAddr string, router http.Handler) service.IServer
@@ -79,10 +73,13 @@ type InitialiserMock struct {
 			Version string
 		}
 	}
+	lockDoGetGraphDB     sync.RWMutex
+	lockDoGetHTTPServer  sync.RWMutex
+	lockDoGetHealthCheck sync.RWMutex
 }
 
 // DoGetGraphDB calls DoGetGraphDBFunc.
-func (mock *InitialiserMock) DoGetGraphDB(ctx context.Context) (api.IGraph, error) {
+func (mock *InitialiserMock) DoGetGraphDB(ctx context.Context) (api.IGraph, service.Closer, error) {
 	if mock.DoGetGraphDBFunc == nil {
 		panic("InitialiserMock.DoGetGraphDBFunc: method is nil but Initialiser.DoGetGraphDB was just called")
 	}
@@ -91,9 +88,9 @@ func (mock *InitialiserMock) DoGetGraphDB(ctx context.Context) (api.IGraph, erro
 	}{
 		Ctx: ctx,
 	}
-	lockInitialiserMockDoGetGraphDB.Lock()
+	mock.lockDoGetGraphDB.Lock()
 	mock.calls.DoGetGraphDB = append(mock.calls.DoGetGraphDB, callInfo)
-	lockInitialiserMockDoGetGraphDB.Unlock()
+	mock.lockDoGetGraphDB.Unlock()
 	return mock.DoGetGraphDBFunc(ctx)
 }
 
@@ -106,9 +103,9 @@ func (mock *InitialiserMock) DoGetGraphDBCalls() []struct {
 	var calls []struct {
 		Ctx context.Context
 	}
-	lockInitialiserMockDoGetGraphDB.RLock()
+	mock.lockDoGetGraphDB.RLock()
 	calls = mock.calls.DoGetGraphDB
-	lockInitialiserMockDoGetGraphDB.RUnlock()
+	mock.lockDoGetGraphDB.RUnlock()
 	return calls
 }
 
@@ -124,9 +121,9 @@ func (mock *InitialiserMock) DoGetHTTPServer(bindAddr string, router http.Handle
 		BindAddr: bindAddr,
 		Router:   router,
 	}
-	lockInitialiserMockDoGetHTTPServer.Lock()
+	mock.lockDoGetHTTPServer.Lock()
 	mock.calls.DoGetHTTPServer = append(mock.calls.DoGetHTTPServer, callInfo)
-	lockInitialiserMockDoGetHTTPServer.Unlock()
+	mock.lockDoGetHTTPServer.Unlock()
 	return mock.DoGetHTTPServerFunc(bindAddr, router)
 }
 
@@ -141,9 +138,9 @@ func (mock *InitialiserMock) DoGetHTTPServerCalls() []struct {
 		BindAddr string
 		Router   http.Handler
 	}
-	lockInitialiserMockDoGetHTTPServer.RLock()
+	mock.lockDoGetHTTPServer.RLock()
 	calls = mock.calls.DoGetHTTPServer
-	lockInitialiserMockDoGetHTTPServer.RUnlock()
+	mock.lockDoGetHTTPServer.RUnlock()
 	return calls
 }
 
@@ -163,9 +160,9 @@ func (mock *InitialiserMock) DoGetHealthCheck(cfg *config.Config, buildTime stri
 		GitCommit: gitCommit,
 		Version:   version,
 	}
-	lockInitialiserMockDoGetHealthCheck.Lock()
+	mock.lockDoGetHealthCheck.Lock()
 	mock.calls.DoGetHealthCheck = append(mock.calls.DoGetHealthCheck, callInfo)
-	lockInitialiserMockDoGetHealthCheck.Unlock()
+	mock.lockDoGetHealthCheck.Unlock()
 	return mock.DoGetHealthCheckFunc(cfg, buildTime, gitCommit, version)
 }
 
@@ -184,8 +181,8 @@ func (mock *InitialiserMock) DoGetHealthCheckCalls() []struct {
 		GitCommit string
 		Version   string
 	}
-	lockInitialiserMockDoGetHealthCheck.RLock()
+	mock.lockDoGetHealthCheck.RLock()
 	calls = mock.calls.DoGetHealthCheck
-	lockInitialiserMockDoGetHealthCheck.RUnlock()
+	mock.lockDoGetHealthCheck.RUnlock()
 	return calls
 }
