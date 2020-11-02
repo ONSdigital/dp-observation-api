@@ -9,11 +9,6 @@ import (
 	"sync"
 )
 
-var (
-	lockIServerMockListenAndServe sync.RWMutex
-	lockIServerMockShutdown       sync.RWMutex
-)
-
 // Ensure, that IServerMock does implement service.IServer.
 // If this is not the case, regenerate this file with moq.
 var _ service.IServer = &IServerMock{}
@@ -54,6 +49,8 @@ type IServerMock struct {
 			Ctx context.Context
 		}
 	}
+	lockListenAndServe sync.RWMutex
+	lockShutdown       sync.RWMutex
 }
 
 // ListenAndServe calls ListenAndServeFunc.
@@ -63,9 +60,9 @@ func (mock *IServerMock) ListenAndServe() error {
 	}
 	callInfo := struct {
 	}{}
-	lockIServerMockListenAndServe.Lock()
+	mock.lockListenAndServe.Lock()
 	mock.calls.ListenAndServe = append(mock.calls.ListenAndServe, callInfo)
-	lockIServerMockListenAndServe.Unlock()
+	mock.lockListenAndServe.Unlock()
 	return mock.ListenAndServeFunc()
 }
 
@@ -76,9 +73,9 @@ func (mock *IServerMock) ListenAndServeCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockIServerMockListenAndServe.RLock()
+	mock.lockListenAndServe.RLock()
 	calls = mock.calls.ListenAndServe
-	lockIServerMockListenAndServe.RUnlock()
+	mock.lockListenAndServe.RUnlock()
 	return calls
 }
 
@@ -92,9 +89,9 @@ func (mock *IServerMock) Shutdown(ctx context.Context) error {
 	}{
 		Ctx: ctx,
 	}
-	lockIServerMockShutdown.Lock()
+	mock.lockShutdown.Lock()
 	mock.calls.Shutdown = append(mock.calls.Shutdown, callInfo)
-	lockIServerMockShutdown.Unlock()
+	mock.lockShutdown.Unlock()
 	return mock.ShutdownFunc(ctx)
 }
 
@@ -107,8 +104,8 @@ func (mock *IServerMock) ShutdownCalls() []struct {
 	var calls []struct {
 		Ctx context.Context
 	}
-	lockIServerMockShutdown.RLock()
+	mock.lockShutdown.RLock()
 	calls = mock.calls.Shutdown
-	lockIServerMockShutdown.RUnlock()
+	mock.lockShutdown.RUnlock()
 	return calls
 }

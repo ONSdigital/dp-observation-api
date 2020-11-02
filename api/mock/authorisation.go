@@ -10,10 +10,6 @@ import (
 	"sync"
 )
 
-var (
-	lockIAuthHandlerMockRequire sync.RWMutex
-)
-
 // Ensure, that IAuthHandlerMock does implement api.IAuthHandler.
 // If this is not the case, regenerate this file with moq.
 var _ api.IAuthHandler = &IAuthHandlerMock{}
@@ -47,6 +43,7 @@ type IAuthHandlerMock struct {
 			Handler http.HandlerFunc
 		}
 	}
+	lockRequire sync.RWMutex
 }
 
 // Require calls RequireFunc.
@@ -61,9 +58,9 @@ func (mock *IAuthHandlerMock) Require(required auth.Permissions, handler http.Ha
 		Required: required,
 		Handler:  handler,
 	}
-	lockIAuthHandlerMockRequire.Lock()
+	mock.lockRequire.Lock()
 	mock.calls.Require = append(mock.calls.Require, callInfo)
-	lockIAuthHandlerMockRequire.Unlock()
+	mock.lockRequire.Unlock()
 	return mock.RequireFunc(required, handler)
 }
 
@@ -78,8 +75,8 @@ func (mock *IAuthHandlerMock) RequireCalls() []struct {
 		Required auth.Permissions
 		Handler  http.HandlerFunc
 	}
-	lockIAuthHandlerMockRequire.RLock()
+	mock.lockRequire.RLock()
 	calls = mock.calls.Require
-	lockIAuthHandlerMockRequire.RUnlock()
+	mock.lockRequire.RUnlock()
 	return calls
 }

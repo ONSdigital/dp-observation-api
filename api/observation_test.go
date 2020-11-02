@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/ONSdigital/dp-net/request"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,7 +16,6 @@ import (
 	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-graph/v2/observation"
 	"github.com/ONSdigital/dp-graph/v2/observation/observationtest"
-	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
@@ -105,7 +105,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-			r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
 			api.Router.ServeHTTP(w, r)
 
@@ -120,7 +120,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		Convey("When request contains query parameters where the dimension name is in upper casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", nil)
-			r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
 			api.Router.ServeHTTP(w, r)
 
@@ -136,7 +136,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 	Convey("A successful request to get multiple observations via a wildcard for a version of a dataset returns 200 OK response", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dimensions := []dataset.VersionDimension{
@@ -224,7 +224,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	t.Parallel()
 	Convey("When the api cannot connect to dataset api return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -246,7 +246,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When the dataset does not exist return status not found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -269,7 +269,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When the dataset version does not exist return status not found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -296,7 +296,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When the dataset exists but is unpublished return status not found for unauthorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -318,7 +318,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When an unpublished version has an incorrect state for an edition of a dataset return not found error for unauthorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -345,7 +345,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When an unpublished version has an incorrect state return an internal error for authorised users", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -359,7 +359,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		pMock := &mock.IAuthHandlerMock{
 			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
-				r = r.WithContext(context.WithValue(r.Context(), dpHTTP.UserIdentityKey, testUserAuthToken))
+				r = r.WithContext(context.WithValue(r.Context(), request.UserIdentityKey, testUserAuthToken))
 				return func(w http.ResponseWriter, r *http.Request) {
 					handler.ServeHTTP(w, r)
 				}
@@ -380,7 +380,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When graph instance node has not got a headers field return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		mockRowReader := &observationtest.StreamRowReaderMock{
@@ -424,7 +424,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When a version document has not got any dimensions field return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -451,7 +451,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When the first header in array does not describe the header row correctly return internal error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		mockRowReader := &observationtest.StreamRowReaderMock{
@@ -495,7 +495,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When an invalid query parameter is set in request return 400 bad request with an error message containing a list of incorrect query parameters", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -524,7 +524,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When there is a missing query parameter that is expected to be set in request return 400 bad request with an error message containing a list of missing query parameters", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -552,7 +552,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When there are too many query parameters that are set to wildcard (*) value request returns 400 bad request", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=*&aggregate=*&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -582,7 +582,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When requested query does not find a unique observation return no observations found", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dcMock := &mock.IDatasetClientMock{
@@ -618,7 +618,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 	Convey("When requested query has a multi-valued dimension return bad request", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001&geography=K02000002", nil)
-		r = r.WithContext(context.WithValue(r.Context(), dpHTTP.FlorenceIdentityKey, testUserAuthToken))
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		dimensions := []dataset.VersionDimension{

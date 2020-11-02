@@ -11,13 +11,6 @@ import (
 	"sync"
 )
 
-var (
-	lockIGraphMockChecker       sync.RWMutex
-	lockIGraphMockClose         sync.RWMutex
-	lockIGraphMockHealthcheck   sync.RWMutex
-	lockIGraphMockStreamCSVRows sync.RWMutex
-)
-
 // Ensure, that IGraphMock does implement api.IGraph.
 // If this is not the case, regenerate this file with moq.
 var _ api.IGraph = &IGraphMock{}
@@ -33,6 +26,9 @@ var _ api.IGraph = &IGraphMock{}
 //             },
 //             CloseFunc: func(ctx context.Context) error {
 // 	               panic("mock out the Close method")
+//             },
+//             ErrorChanFunc: func() chan error {
+// 	               panic("mock out the ErrorChan method")
 //             },
 //             HealthcheckFunc: func() (string, error) {
 // 	               panic("mock out the Healthcheck method")
@@ -52,6 +48,9 @@ type IGraphMock struct {
 
 	// CloseFunc mocks the Close method.
 	CloseFunc func(ctx context.Context) error
+
+	// ErrorChanFunc mocks the ErrorChan method.
+	ErrorChanFunc func() chan error
 
 	// HealthcheckFunc mocks the Healthcheck method.
 	HealthcheckFunc func() (string, error)
@@ -73,6 +72,9 @@ type IGraphMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// ErrorChan holds details about calls to the ErrorChan method.
+		ErrorChan []struct {
+		}
 		// Healthcheck holds details about calls to the Healthcheck method.
 		Healthcheck []struct {
 		}
@@ -90,6 +92,11 @@ type IGraphMock struct {
 			Limit *int
 		}
 	}
+	lockChecker       sync.RWMutex
+	lockClose         sync.RWMutex
+	lockErrorChan     sync.RWMutex
+	lockHealthcheck   sync.RWMutex
+	lockStreamCSVRows sync.RWMutex
 }
 
 // Checker calls CheckerFunc.
@@ -104,9 +111,9 @@ func (mock *IGraphMock) Checker(ctx context.Context, state *healthcheck.CheckSta
 		Ctx:   ctx,
 		State: state,
 	}
-	lockIGraphMockChecker.Lock()
+	mock.lockChecker.Lock()
 	mock.calls.Checker = append(mock.calls.Checker, callInfo)
-	lockIGraphMockChecker.Unlock()
+	mock.lockChecker.Unlock()
 	return mock.CheckerFunc(ctx, state)
 }
 
@@ -121,9 +128,9 @@ func (mock *IGraphMock) CheckerCalls() []struct {
 		Ctx   context.Context
 		State *healthcheck.CheckState
 	}
-	lockIGraphMockChecker.RLock()
+	mock.lockChecker.RLock()
 	calls = mock.calls.Checker
-	lockIGraphMockChecker.RUnlock()
+	mock.lockChecker.RUnlock()
 	return calls
 }
 
@@ -137,9 +144,9 @@ func (mock *IGraphMock) Close(ctx context.Context) error {
 	}{
 		Ctx: ctx,
 	}
-	lockIGraphMockClose.Lock()
+	mock.lockClose.Lock()
 	mock.calls.Close = append(mock.calls.Close, callInfo)
-	lockIGraphMockClose.Unlock()
+	mock.lockClose.Unlock()
 	return mock.CloseFunc(ctx)
 }
 
@@ -152,9 +159,35 @@ func (mock *IGraphMock) CloseCalls() []struct {
 	var calls []struct {
 		Ctx context.Context
 	}
-	lockIGraphMockClose.RLock()
+	mock.lockClose.RLock()
 	calls = mock.calls.Close
-	lockIGraphMockClose.RUnlock()
+	mock.lockClose.RUnlock()
+	return calls
+}
+
+// ErrorChan calls ErrorChanFunc.
+func (mock *IGraphMock) ErrorChan() chan error {
+	if mock.ErrorChanFunc == nil {
+		panic("IGraphMock.ErrorChanFunc: method is nil but IGraph.ErrorChan was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockErrorChan.Lock()
+	mock.calls.ErrorChan = append(mock.calls.ErrorChan, callInfo)
+	mock.lockErrorChan.Unlock()
+	return mock.ErrorChanFunc()
+}
+
+// ErrorChanCalls gets all the calls that were made to ErrorChan.
+// Check the length with:
+//     len(mockedIGraph.ErrorChanCalls())
+func (mock *IGraphMock) ErrorChanCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockErrorChan.RLock()
+	calls = mock.calls.ErrorChan
+	mock.lockErrorChan.RUnlock()
 	return calls
 }
 
@@ -165,9 +198,9 @@ func (mock *IGraphMock) Healthcheck() (string, error) {
 	}
 	callInfo := struct {
 	}{}
-	lockIGraphMockHealthcheck.Lock()
+	mock.lockHealthcheck.Lock()
 	mock.calls.Healthcheck = append(mock.calls.Healthcheck, callInfo)
-	lockIGraphMockHealthcheck.Unlock()
+	mock.lockHealthcheck.Unlock()
 	return mock.HealthcheckFunc()
 }
 
@@ -178,9 +211,9 @@ func (mock *IGraphMock) HealthcheckCalls() []struct {
 } {
 	var calls []struct {
 	}
-	lockIGraphMockHealthcheck.RLock()
+	mock.lockHealthcheck.RLock()
 	calls = mock.calls.Healthcheck
-	lockIGraphMockHealthcheck.RUnlock()
+	mock.lockHealthcheck.RUnlock()
 	return calls
 }
 
@@ -202,9 +235,9 @@ func (mock *IGraphMock) StreamCSVRows(ctx context.Context, instanceID string, fi
 		Filters:    filters,
 		Limit:      limit,
 	}
-	lockIGraphMockStreamCSVRows.Lock()
+	mock.lockStreamCSVRows.Lock()
 	mock.calls.StreamCSVRows = append(mock.calls.StreamCSVRows, callInfo)
-	lockIGraphMockStreamCSVRows.Unlock()
+	mock.lockStreamCSVRows.Unlock()
 	return mock.StreamCSVRowsFunc(ctx, instanceID, filterID, filters, limit)
 }
 
@@ -225,8 +258,8 @@ func (mock *IGraphMock) StreamCSVRowsCalls() []struct {
 		Filters    *observation.DimensionFilters
 		Limit      *int
 	}
-	lockIGraphMockStreamCSVRows.RLock()
+	mock.lockStreamCSVRows.RLock()
 	calls = mock.calls.StreamCSVRows
-	lockIGraphMockStreamCSVRows.RUnlock()
+	mock.lockStreamCSVRows.RUnlock()
 	return calls
 }

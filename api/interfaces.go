@@ -19,6 +19,7 @@ import (
 type IGraph interface {
 	driver.Driver
 	StreamCSVRows(ctx context.Context, instanceID, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error)
+	ErrorChan() chan error
 }
 
 // IDatasetClient represents the required methods from the Dataset Client required by Observation API

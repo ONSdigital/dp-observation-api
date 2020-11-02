@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"github.com/ONSdigital/dp-net/request"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/ONSdigital/dp-authorisation/auth"
-	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
@@ -22,7 +22,7 @@ import (
 const testServiceAuthToken = "testServiceAuthToken"
 const testUserAuthToken = "testUserAuthToken"
 
-var ctx = context.WithValue(context.Background(), dpHTTP.FlorenceIdentityKey, testUserAuthToken)
+var ctx = context.WithValue(context.Background(), request.FlorenceIdentityKey, testUserAuthToken)
 
 var (
 	mu          sync.Mutex

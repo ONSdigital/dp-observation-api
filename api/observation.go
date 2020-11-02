@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"github.com/ONSdigital/dp-net/request"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 
 	dataset "github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
-	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/apierrors"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
@@ -277,8 +277,8 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 // getUserAuthToken obtains the user auth token from the context, expected under FlorenceIdentityKey
 func getUserAuthToken(ctx context.Context) string {
 
-	if dpHTTP.IsFlorenceIdentityPresent(ctx) {
-		return ctx.Value(dpHTTP.FlorenceIdentityKey).(string)
+	if request.IsFlorenceIdentityPresent(ctx) {
+		return ctx.Value(request.FlorenceIdentityKey).(string)
 	}
 
 	return ""

@@ -11,12 +11,6 @@ import (
 	"sync"
 )
 
-var (
-	lockIDatasetClientMockChecker    sync.RWMutex
-	lockIDatasetClientMockGet        sync.RWMutex
-	lockIDatasetClientMockGetVersion sync.RWMutex
-)
-
 // Ensure, that IDatasetClientMock does implement api.IDatasetClient.
 // If this is not the case, regenerate this file with moq.
 var _ api.IDatasetClient = &IDatasetClientMock{}
@@ -94,6 +88,9 @@ type IDatasetClientMock struct {
 			Version string
 		}
 	}
+	lockChecker    sync.RWMutex
+	lockGet        sync.RWMutex
+	lockGetVersion sync.RWMutex
 }
 
 // Checker calls CheckerFunc.
@@ -108,9 +105,9 @@ func (mock *IDatasetClientMock) Checker(ctx context.Context, check *healthcheck.
 		Ctx:   ctx,
 		Check: check,
 	}
-	lockIDatasetClientMockChecker.Lock()
+	mock.lockChecker.Lock()
 	mock.calls.Checker = append(mock.calls.Checker, callInfo)
-	lockIDatasetClientMockChecker.Unlock()
+	mock.lockChecker.Unlock()
 	return mock.CheckerFunc(ctx, check)
 }
 
@@ -125,9 +122,9 @@ func (mock *IDatasetClientMock) CheckerCalls() []struct {
 		Ctx   context.Context
 		Check *healthcheck.CheckState
 	}
-	lockIDatasetClientMockChecker.RLock()
+	mock.lockChecker.RLock()
 	calls = mock.calls.Checker
-	lockIDatasetClientMockChecker.RUnlock()
+	mock.lockChecker.RUnlock()
 	return calls
 }
 
@@ -149,9 +146,9 @@ func (mock *IDatasetClientMock) Get(ctx context.Context, userAuthToken string, s
 		CollectionID:     collectionID,
 		DatasetID:        datasetID,
 	}
-	lockIDatasetClientMockGet.Lock()
+	mock.lockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
-	lockIDatasetClientMockGet.Unlock()
+	mock.lockGet.Unlock()
 	return mock.GetFunc(ctx, userAuthToken, serviceAuthToken, collectionID, datasetID)
 }
 
@@ -172,9 +169,9 @@ func (mock *IDatasetClientMock) GetCalls() []struct {
 		CollectionID     string
 		DatasetID        string
 	}
-	lockIDatasetClientMockGet.RLock()
+	mock.lockGet.RLock()
 	calls = mock.calls.Get
-	lockIDatasetClientMockGet.RUnlock()
+	mock.lockGet.RUnlock()
 	return calls
 }
 
@@ -202,9 +199,9 @@ func (mock *IDatasetClientMock) GetVersion(ctx context.Context, userAuthToken st
 		Edition:                  edition,
 		Version:                  version,
 	}
-	lockIDatasetClientMockGetVersion.Lock()
+	mock.lockGetVersion.Lock()
 	mock.calls.GetVersion = append(mock.calls.GetVersion, callInfo)
-	lockIDatasetClientMockGetVersion.Unlock()
+	mock.lockGetVersion.Unlock()
 	return mock.GetVersionFunc(ctx, userAuthToken, serviceAuthToken, downloadServiceAuthToken, collectionID, datasetID, edition, version)
 }
 
@@ -231,8 +228,8 @@ func (mock *IDatasetClientMock) GetVersionCalls() []struct {
 		Edition                  string
 		Version                  string
 	}
-	lockIDatasetClientMockGetVersion.RLock()
+	mock.lockGetVersion.RLock()
 	calls = mock.calls.GetVersion
-	lockIDatasetClientMockGetVersion.RUnlock()
+	mock.lockGetVersion.RUnlock()
 	return calls
 }

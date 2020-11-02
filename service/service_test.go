@@ -30,8 +30,8 @@ var (
 	errHealthcheck = errors.New("healthCheck error")
 )
 
-var funcDoGetGraphDbErr = func(ctx context.Context) (api.IGraph, error) {
-	return nil, errGraph
+var funcDoGetGraphDbErr = func(ctx context.Context) (api.IGraph, service.Closer, error) {
+	return nil, nil, errGraph
 }
 
 var funcDoGetHealthcheckErr = func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
@@ -51,7 +51,12 @@ func TestRunPrivate(t *testing.T) {
 		cfg.EnablePrivateEndpoints = true
 
 		graphDbMock := &apiMock.IGraphMock{
-			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			CheckerFunc:   func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			ErrorChanFunc: func() chan error { return nil },
+		}
+
+		graphErrorConsumerMock := &serviceMock.CloserMock{
+			CloseFunc: func(ctx context.Context) error { return nil },
 		}
 
 		hcMock := &serviceMock.IHealthCheckMock{
@@ -67,8 +72,8 @@ func TestRunPrivate(t *testing.T) {
 			},
 		}
 
-		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, error) {
-			return graphDbMock, nil
+		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, service.Closer, error) {
+			return graphDbMock, graphErrorConsumerMock, nil
 		}
 
 		funcDoGetHealthcheckOk := func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
@@ -189,7 +194,12 @@ func TestRunPublic(t *testing.T) {
 		cfg.EnablePrivateEndpoints = false
 
 		graphDbMock := &apiMock.IGraphMock{
-			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			CheckerFunc:   func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			ErrorChanFunc: func() chan error { return nil },
+		}
+
+		graphErrorConsumerMock := &serviceMock.CloserMock{
+			CloseFunc: func(ctx context.Context) error { return nil },
 		}
 
 		hcMock := &serviceMock.IHealthCheckMock{
@@ -205,8 +215,8 @@ func TestRunPublic(t *testing.T) {
 			},
 		}
 
-		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, error) {
-			return graphDbMock, nil
+		funcDoGetGraphDbOk := func(ctx context.Context) (api.IGraph, service.Closer, error) {
+			return graphDbMock, graphErrorConsumerMock, nil
 		}
 
 		funcDoGetHealthcheckOk := func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
@@ -328,13 +338,18 @@ func TestClose(t *testing.T) {
 
 		// graphDB Close will fail if healthcheck and http server
 		graphDbMock := &apiMock.IGraphMock{
-			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			CheckerFunc:   func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+			ErrorChanFunc: func() chan error { return nil },
 			CloseFunc: func(ctx context.Context) error {
 				if !hcStopped || !serverStopped {
 					return errors.New("GraphDB closed before stopping healthcheck or HTTP server")
 				}
 				return nil
 			},
+		}
+
+		graphErrorConsumerMock := &serviceMock.CloserMock{
+			CloseFunc: func(ctx context.Context) error { return nil },
 		}
 
 		// healthcheck Stop does not depend on any other service being closed/stopped
@@ -360,7 +375,9 @@ func TestClose(t *testing.T) {
 
 			initMock := &mock.InitialiserMock{
 				DoGetHTTPServerFunc: func(bindAddr string, router http.Handler) service.IServer { return serverMock },
-				DoGetGraphDBFunc:    func(ctx context.Context) (api.IGraph, error) { return graphDbMock, nil },
+				DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
+					return graphDbMock, graphErrorConsumerMock, nil
+				},
 				DoGetHealthCheckFunc: func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
 					return hcMock, nil
 				},
@@ -376,6 +393,7 @@ func TestClose(t *testing.T) {
 			So(len(hcMock.StopCalls()), ShouldEqual, 1)
 			So(len(serverMock.ShutdownCalls()), ShouldEqual, 1)
 			So(len(graphDbMock.CloseCalls()), ShouldEqual, 1)
+			So(len(graphErrorConsumerMock.CloseCalls()), ShouldEqual, 1)
 		})
 
 		Convey("If services fail to stop, the Close operation tries to close all dependencies and returns an error", func() {
@@ -389,7 +407,9 @@ func TestClose(t *testing.T) {
 
 			initMock := &mock.InitialiserMock{
 				DoGetHTTPServerFunc: func(bindAddr string, router http.Handler) service.IServer { return failingserverMock },
-				DoGetGraphDBFunc:    func(ctx context.Context) (api.IGraph, error) { return graphDbMock, nil },
+				DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
+					return graphDbMock, graphErrorConsumerMock, nil
+				},
 				DoGetHealthCheckFunc: func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
 					return hcMock, nil
 				},
@@ -405,6 +425,7 @@ func TestClose(t *testing.T) {
 			So(len(hcMock.StopCalls()), ShouldEqual, 1)
 			So(len(failingserverMock.ShutdownCalls()), ShouldEqual, 1)
 			So(len(graphDbMock.CloseCalls()), ShouldEqual, 1)
+			So(len(graphErrorConsumerMock.CloseCalls()), ShouldEqual, 1)
 		})
 	})
 }

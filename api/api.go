@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ONSdigital/dp-authorisation/auth"
-	dpHTTP "github.com/ONSdigital/dp-net/http"
+	"github.com/ONSdigital/dp-net/request"
 	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/log.go/log"
 	"github.com/gorilla/mux"
@@ -42,13 +42,13 @@ func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGrap
 
 func (api *API) checkIfAuthorised(r *http.Request, logData log.Data) (authorised bool) {
 
-	callerIdentity := dpHTTP.Caller(r.Context())
+	callerIdentity := request.Caller(r.Context())
 	if callerIdentity != "" {
 		logData["caller_identity"] = callerIdentity
 		authorised = true
 	}
 
-	userIdentity := dpHTTP.User(r.Context())
+	userIdentity := request.User(r.Context())
 	if userIdentity != "" {
 		logData["user_identity"] = userIdentity
 		authorised = true

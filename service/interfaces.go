@@ -12,11 +12,12 @@ import (
 //go:generate moq -out mock/initialiser.go -pkg mock . Initialiser
 //go:generate moq -out mock/server.go -pkg mock . IServer
 //go:generate moq -out mock/healthCheck.go -pkg mock . IHealthCheck
+//go:generate moq -out mock/closer.go -pkg mock . Closer
 
 // Initialiser defines the methods to initialise external services
 type Initialiser interface {
 	DoGetHTTPServer(bindAddr string, router http.Handler) IServer
-	DoGetGraphDB(ctx context.Context) (api.IGraph, error)
+	DoGetGraphDB(ctx context.Context) (api.IGraph, Closer, error)
 	DoGetHealthCheck(cfg *config.Config, buildTime, gitCommit, version string) (IHealthCheck, error)
 }
 
@@ -32,4 +33,8 @@ type IHealthCheck interface {
 	Start(ctx context.Context)
 	Stop()
 	AddCheck(name string, checker healthcheck.Checker) (err error)
+}
+
+type Closer interface {
+	Close(ctx context.Context) error
 }
