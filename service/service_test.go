@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	"github.com/ONSdigital/dp-observation-api/api"
@@ -38,7 +39,7 @@ var funcDoGetHealthcheckErr = func(cfg *config.Config, buildTime string, gitComm
 	return nil, errHealthcheck
 }
 
-var funcDoGetHTTPServerNil = func(bindAddr string, router http.Handler) service.IServer {
+var funcDoGetHTTPServerNil = func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
 	return nil
 }
 
@@ -80,7 +81,7 @@ func TestRunPrivate(t *testing.T) {
 			return hcMock, nil
 		}
 
-		funcDoGetHTTPServer := func(bindAddr string, router http.Handler) service.IServer {
+		funcDoGetHTTPServer := func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
 			return serverMock
 		}
 
@@ -223,7 +224,7 @@ func TestRunPublic(t *testing.T) {
 			return hcMock, nil
 		}
 
-		funcDoGetHTTPServer := func(bindAddr string, router http.Handler) service.IServer {
+		funcDoGetHTTPServer := func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
 			return serverMock
 		}
 
@@ -374,7 +375,9 @@ func TestClose(t *testing.T) {
 		Convey("Closing the service results in all the dependencies being closed in the expected order", func() {
 
 			initMock := &mock.InitialiserMock{
-				DoGetHTTPServerFunc: func(bindAddr string, router http.Handler) service.IServer { return serverMock },
+				DoGetHTTPServerFunc: func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
+					return serverMock
+				},
 				DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
 					return graphDbMock, graphErrorConsumerMock, nil
 				},
@@ -406,7 +409,9 @@ func TestClose(t *testing.T) {
 			}
 
 			initMock := &mock.InitialiserMock{
-				DoGetHTTPServerFunc: func(bindAddr string, router http.Handler) service.IServer { return failingserverMock },
+				DoGetHTTPServerFunc: func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
+					return failingserverMock
+				},
 				DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
 					return graphDbMock, graphErrorConsumerMock, nil
 				},

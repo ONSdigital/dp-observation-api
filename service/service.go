@@ -33,7 +33,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 
 	// Get HTTP Server
 	r := mux.NewRouter()
-	s := serviceList.GetHTTPServer(cfg.BindAddr, r)
+	s := serviceList.GetHTTPServer(cfg.BindAddr, cfg.HttpWriteTimeout, r)
 
 	// Get graphDB connection for observation store
 	graphDB, graphErrorConsumer, err := serviceList.GetGraphDB(ctx)

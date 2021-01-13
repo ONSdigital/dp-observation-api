@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	"github.com/ONSdigital/dp-observation-api/api"
@@ -16,7 +17,7 @@ import (
 
 // Initialiser defines the methods to initialise external services
 type Initialiser interface {
-	DoGetHTTPServer(bindAddr string, router http.Handler) IServer
+	DoGetHTTPServer(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) IServer
 	DoGetGraphDB(ctx context.Context) (api.IGraph, Closer, error)
 	DoGetHealthCheck(cfg *config.Config, buildTime, gitCommit, version string) (IHealthCheck, error)
 }
