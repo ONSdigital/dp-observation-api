@@ -9,6 +9,7 @@ import (
 // Config represents service configuration for dp-observation-api
 type Config struct {
 	BindAddr                   string        `envconfig:"BIND_ADDR"`
+	HttpWriteTimeout           time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
 	ServiceAuthToken           string        `envconfig:"SERVICE_AUTH_TOKEN"`
 	DatasetAPIURL              string        `envconfig:"DATASET_API_URL"`
 	ObservationAPIURL          string        `envconfig:"OBSERVATION_API_URL"`
@@ -31,6 +32,7 @@ func Get() (*Config, error) {
 
 	cfg := &Config{
 		BindAddr:                   ":24500",
+		HttpWriteTimeout:           60 * time.Second,
 		ServiceAuthToken:           "",
 		DatasetAPIURL:              "http://localhost:22000",
 		ObservationAPIURL:          "http://localhost:24500",

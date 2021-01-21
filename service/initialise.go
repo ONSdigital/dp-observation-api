@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/ONSdigital/dp-graph/v2/graph"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
@@ -32,8 +33,8 @@ func NewServiceList(initialiser Initialiser) *ExternalServiceList {
 type Init struct{}
 
 // GetHTTPServer creates an http server and sets the Server flag to true
-func (e *ExternalServiceList) GetHTTPServer(bindAddr string, router http.Handler) IServer {
-	s := e.Init.DoGetHTTPServer(bindAddr, router)
+func (e *ExternalServiceList) GetHTTPServer(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) IServer {
+	s := e.Init.DoGetHTTPServer(bindAddr, httpWriteTimeout, router)
 	e.HTTPServer = true
 	return s
 }
@@ -59,8 +60,9 @@ func (e *ExternalServiceList) GetHealthCheck(cfg *config.Config, buildTime, gitC
 }
 
 // DoGetHTTPServer creates an HTTP Server with the provided bind address and router
-func (e *Init) DoGetHTTPServer(bindAddr string, router http.Handler) IServer {
+func (e *Init) DoGetHTTPServer(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) IServer {
 	s := dpHTTP.NewServer(bindAddr, router)
+	s.WriteTimeout = httpWriteTimeout
 	s.HandleOSSignals = false
 	return s
 }

@@ -20,6 +20,7 @@ func TestConfig(t *testing.T) {
 			Convey("Then the values should be set to the expected defaults", func() {
 				So(cfg, ShouldResemble, &Config{
 					BindAddr:                   ":24500",
+					HttpWriteTimeout:           60 * time.Second,
 					ServiceAuthToken:           "",
 					DatasetAPIURL:              "http://localhost:22000",
 					ObservationAPIURL:          "http://localhost:24500",
