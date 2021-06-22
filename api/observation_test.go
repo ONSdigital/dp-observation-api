@@ -100,17 +100,24 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
-			api.Router.ServeHTTP(w, r)
+			ap.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithSingleObservation"))
@@ -125,7 +132,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", nil)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
-			api.Router.ServeHTTP(w, r)
+			ap.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedSecondDocWithSingleObservation"))
@@ -205,13 +212,20 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
 
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
-		api.Router.ServeHTTP(w, r)
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
 		So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithMultipleObservations"))
@@ -413,10 +427,17 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
-		api.Router.ServeHTTP(w, r)
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
@@ -485,10 +506,17 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
-		api.Router.ServeHTTP(w, r)
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
 		validateGetDataset(dcMock, "cpih012")
@@ -606,10 +634,17 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
-		api.Router.ServeHTTP(w, r)
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrObservationsNotFound.Error())
