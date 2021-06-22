@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/ONSdigital/dp-net/request"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/ONSdigital/dp-net/request"
+	"github.com/pkg/errors"
 
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-authorisation/auth"
@@ -20,6 +22,7 @@ import (
 	"github.com/ONSdigital/dp-observation-api/api/mock"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/config"
+	"github.com/ONSdigital/dp-observation-api/models"
 	"github.com/ONSdigital/log.go/log"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -897,4 +900,165 @@ func validateGetVersion(dcMock *mock.IDatasetClientMock, datasetID, edition, ver
 	So(dcMock.GetVersionCalls()[0].Version, ShouldEqual, version)
 	So(dcMock.GetVersionCalls()[0].ServiceAuthToken, ShouldEqual, testServiceAuthToken)
 	So(dcMock.GetVersionCalls()[0].UserAuthToken, ShouldEqual, testUserAuthToken)
+}
+
+func TestSortFilter(t *testing.T) {
+	eventFilterSubmitted := models.FilterSubmitted{
+		FilterID:   "whatever",
+		InstanceID: "460b5039-bb09-4038-b8eb-9091713f4497",
+		DatasetID:  "older-people-economic-activity",
+		Edition:    "time-series",
+		Version:    "1",
+	}
+
+	mockRowReader := &observationtest.StreamRowReaderMock{
+		ReadFunc: func() (string, error) {
+			return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+		},
+		CloseFunc: func(context.Context) error {
+			return nil
+		},
+	}
+
+	graphDBMock := &mock.IGraphMock{
+		StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
+			return mockRowReader, nil
+		},
+	}
+
+	var pub = false
+
+	// The following test is to code cover the first return in SortFilter
+	Convey("Given a dimension of one, with a mock GetOptions", t, func() {
+		var dbFilter = observation.DimensionFilters{
+			Dimensions: []*observation.Dimension{
+				{
+					Name:    "economicactivity",
+					Options: []string{"economic-activity", "employment-rate"},
+				},
+			},
+			Published: &pub,
+		}
+
+		dcMock := &mock.IDatasetClientMock{
+			GetOptionsFunc: func(context.Context, string, string, string, string, string, string, string, *dataset.QueryParams) (dataset.Options, error) {
+				return dataset.Options{}, nil
+			},
+		}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+
+		cfg.ObservationAPIURL = "http://localhost:8082"
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+
+		Convey("When SortFilter is called", func() {
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+
+			Convey("The dimension sees no change", func() {
+				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 0)
+				So(dbFilter.Dimensions[0].Name, ShouldEqual, "economicactivity")
+			})
+		})
+	})
+
+	Convey("Given a dimension of three, with a mock GetOptions that returns nil simulating error getting record from mongo", t, func() {
+		var dbFilter = observation.DimensionFilters{
+			Dimensions: []*observation.Dimension{
+				{
+					Name:    "economicactivity",
+					Options: []string{"economic-activity", "employment-rate"},
+				},
+				{
+					Name:    "geography",
+					Options: []string{"W92000004"},
+				},
+				{
+					Name:    "sex",
+					Options: []string{"people", "men"},
+				},
+			},
+			Published: &pub,
+		}
+
+		dcMock := &mock.IDatasetClientMock{
+			GetOptionsFunc: func(context.Context, string, string, string, string, string, string, string, *dataset.QueryParams) (dataset.Options, error) {
+				return dataset.Options{}, errors.New("can't find record")
+			},
+		}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+
+		cfg.ObservationAPIURL = "http://localhost:8082"
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+
+		Convey("When SortFilter is called", func() {
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+
+			Convey("The dimension order puts 'geogrphy' first and the rest retain their order", func() {
+				// NOTE: As we are simulating mongo errors, depending on how fast the loop in SortFilter
+				// manages to run all 3 go routines for the 3 dimensions, sometimes the 1st go routine
+				// launched may return the expected error from simulated mongo and exit the loop before
+				// the 3rd go routine runs ...
+				// which means we can not check the value of GetOptionCalls() as elsewhere as it might
+				// return 2 or it might return 3
+				// So(len(datasetAPIMock.GetOptionsCalls()), ShouldEqual, 3)
+				So(dbFilter.Dimensions[0].Name, ShouldEqual, "geography")
+				So(dbFilter.Dimensions[1].Name, ShouldEqual, "economicactivity")
+				So(dbFilter.Dimensions[2].Name, ShouldEqual, "sex")
+			})
+		})
+	})
+
+	Convey("Given a dimension of three, with a mock GetOptions that returns size of a Dimension", t, func() {
+		var dbFilter = observation.DimensionFilters{
+			Dimensions: []*observation.Dimension{
+				{
+					Name:    "economicactivity",
+					Options: []string{"economic-activity", "employment-rate"},
+				},
+				{
+					Name:    "geography",
+					Options: []string{"W92000004"},
+				},
+				{
+					Name:    "sex",
+					Options: []string{"people", "men"},
+				},
+			},
+			Published: &pub,
+		}
+
+		dcMock := &mock.IDatasetClientMock{
+			GetOptionsFunc: func(ctx context.Context, userAuthToken, serviceAuthToken, collectionID, id, edition, version, dimension string, q *dataset.QueryParams) (dataset.Options, error) {
+				switch dimension {
+				case "economicactivity":
+					return dataset.Options{TotalCount: 2}, nil // smallest
+				case "geography":
+					return dataset.Options{TotalCount: 383}, nil // largest
+				case "sex":
+					return dataset.Options{TotalCount: 3}, nil // in the middle
+				}
+				return dataset.Options{}, errors.New("can't find record")
+			},
+		}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+
+		cfg.ObservationAPIURL = "http://localhost:8082"
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+
+		Convey("When SortFilter is called", func() {
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+
+			Convey("The dimension order is returned by largest dimension first to smallest last order", func() {
+				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 3)
+				So(dbFilter.Dimensions[0].Name, ShouldEqual, "geography")        // largest first
+				So(dbFilter.Dimensions[1].Name, ShouldEqual, "sex")              // in the middle
+				So(dbFilter.Dimensions[2].Name, ShouldEqual, "economicactivity") // smallest last
+			})
+		})
+	})
 }
