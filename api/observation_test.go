@@ -104,7 +104,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		defer func() {
 			api.SortFilter = originalFunc
 		}()
-		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
 		}
 
 		cfg, err := config.Get()
@@ -216,7 +216,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		defer func() {
 			api.SortFilter = originalFunc
 		}()
-		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
 		}
 
 		cfg, err := config.Get()
@@ -431,7 +431,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		defer func() {
 			api.SortFilter = originalFunc
 		}()
-		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
 		}
 
 		cfg, err := config.Get()
@@ -510,7 +510,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		defer func() {
 			api.SortFilter = originalFunc
 		}()
-		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
 		}
 
 		cfg, err := config.Get()
@@ -638,7 +638,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		defer func() {
 			api.SortFilter = originalFunc
 		}()
-		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
 		}
 
 		cfg, err := config.Get()
@@ -988,7 +988,7 @@ func TestSortFilter(t *testing.T) {
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension sees no change", func() {
 				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 0)
@@ -1029,7 +1029,7 @@ func TestSortFilter(t *testing.T) {
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension order puts 'geogrphy' first and the rest retain their order", func() {
 				// NOTE: As we are simulating mongo errors, depending on how fast the loop in SortFilter
@@ -1086,7 +1086,7 @@ func TestSortFilter(t *testing.T) {
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter, testUserAuthToken)
+			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension order is returned by largest dimension first to smallest last order", func() {
 				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 3)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -295,7 +296,7 @@ func getUserAuthToken(ctx context.Context) string {
 // sortFilter by Dimension size, largest first, to make Neptune searches faster
 // The sort is done here because the sizes are retrieved from Mongo and
 // its best not to have the dp-graph library acquiring such coupling to its caller.
-var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters, userAuthToken string) {
+var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters /*, userAuthToken string*/) {
 	nofDimensions := len(dbFilter.Dimensions)
 	if nofDimensions <= 1 {
 		return
@@ -310,13 +311,13 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 	var dimSizesMutex sync.Mutex
 
 	// get info from mongo
-	var getErrorFlag int32
+	var getErrorCount int32
 	var concurrent = 10 // limit number of go routines so as to not put too much on heap
 	var semaphoreChan = make(chan struct{}, concurrent)
 	var wg sync.WaitGroup // number of working goroutines
 
 	for i, dimension := range dbFilter.Dimensions {
-		if atomic.LoadInt32(&getErrorFlag) != 0 {
+		if atomic.LoadInt32(&getErrorCount) != 0 {
 			break
 		}
 		semaphoreChan <- struct{}{} // block while full
@@ -334,14 +335,19 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 			// passing a 'Limit' of 0 makes GetOptions skip getting the documents
 			// and to return only what we are interested in: TotalCount
 			options, err := api.datasetClient.GetOptions(ctx,
-				userAuthToken,
-				"", //serviceAuthToken,
+				"", // userAuthToken,
+				api.cfg.ServiceAuthToken,
 				"", // collectionID
 				event.DatasetID, event.Edition, event.Version, dimension.Name,
 				&dataset.QueryParams{Offset: 0, Limit: 0})
 
 			if err != nil {
-				atomic.AddInt32(&getErrorFlag, 1)
+				if atomic.AddInt32(&getErrorCount, 1) <= 2 {
+					// only show a few of possibly hundreds of errors, as once someone
+					// looks into the one error they may fix all associated errors
+					logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version, "dimension name": dimension.Name}
+					log.Event(ctx, "SortFilter: GetOptions failed for dataset and dimension", log.INFO, logData)
+				}
 			} else {
 				d := dim{dimensionSize: options.TotalCount, index: i}
 				dimSizesMutex.Lock()
@@ -352,7 +358,9 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 	}
 	wg.Wait()
 
-	if getErrorFlag != 0 {
+	if getErrorCount != 0 {
+		logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version}
+		log.Event(ctx, fmt.Sprintf("SortFilter: GetOptions failed for dataset %d times, sorting by default of 'geography' first", getErrorCount), log.INFO, logData)
 		// Frig dimension sizes and if geography is present, make it the largest (because it typically is the largest)
 		// and to retain compatibility with what the neptune dp-graph library was doing without access to information
 		// from mongo.
@@ -417,7 +425,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 		Dimensions: dimensionFilters,
 	}
 
-	SortFilter(ctx, api, event, &queryObject, userAuthToken)
+	SortFilter(ctx, api, event, &queryObject)
 
 	logData["query_object"] = queryObject
 
