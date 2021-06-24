@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -8,6 +9,9 @@ import (
 )
 
 func TestConfig(t *testing.T) {
+
+	os.Clearenv()
+
 	Convey("Given an environment with no environment variables set", t, func() {
 		cfg, err := Get()
 

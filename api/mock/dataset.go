@@ -27,6 +27,9 @@ var _ api.IDatasetClient = &IDatasetClientMock{}
 //             GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
 // 	               panic("mock out the Get method")
 //             },
+//             GetOptionsFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, id string, edition string, version string, dimension string, q *dataset.QueryParams) (dataset.Options, error) {
+// 	               panic("mock out the GetOptions method")
+//             },
 //             GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
 // 	               panic("mock out the GetVersion method")
 //             },
@@ -42,6 +45,9 @@ type IDatasetClientMock struct {
 
 	// GetFunc mocks the Get method.
 	GetFunc func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error)
+
+	// GetOptionsFunc mocks the GetOptions method.
+	GetOptionsFunc func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, id string, edition string, version string, dimension string, q *dataset.QueryParams) (dataset.Options, error)
 
 	// GetVersionFunc mocks the GetVersion method.
 	GetVersionFunc func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error)
@@ -68,6 +74,27 @@ type IDatasetClientMock struct {
 			// DatasetID is the datasetID argument value.
 			DatasetID string
 		}
+		// GetOptions holds details about calls to the GetOptions method.
+		GetOptions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// UserAuthToken is the userAuthToken argument value.
+			UserAuthToken string
+			// ServiceAuthToken is the serviceAuthToken argument value.
+			ServiceAuthToken string
+			// CollectionID is the collectionID argument value.
+			CollectionID string
+			// ID is the id argument value.
+			ID string
+			// Edition is the edition argument value.
+			Edition string
+			// Version is the version argument value.
+			Version string
+			// Dimension is the dimension argument value.
+			Dimension string
+			// Q is the q argument value.
+			Q *dataset.QueryParams
+		}
 		// GetVersion holds details about calls to the GetVersion method.
 		GetVersion []struct {
 			// Ctx is the ctx argument value.
@@ -90,6 +117,7 @@ type IDatasetClientMock struct {
 	}
 	lockChecker    sync.RWMutex
 	lockGet        sync.RWMutex
+	lockGetOptions sync.RWMutex
 	lockGetVersion sync.RWMutex
 }
 
@@ -172,6 +200,69 @@ func (mock *IDatasetClientMock) GetCalls() []struct {
 	mock.lockGet.RLock()
 	calls = mock.calls.Get
 	mock.lockGet.RUnlock()
+	return calls
+}
+
+// GetOptions calls GetOptionsFunc.
+func (mock *IDatasetClientMock) GetOptions(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, id string, edition string, version string, dimension string, q *dataset.QueryParams) (dataset.Options, error) {
+	if mock.GetOptionsFunc == nil {
+		panic("IDatasetClientMock.GetOptionsFunc: method is nil but IDatasetClient.GetOptions was just called")
+	}
+	callInfo := struct {
+		Ctx              context.Context
+		UserAuthToken    string
+		ServiceAuthToken string
+		CollectionID     string
+		ID               string
+		Edition          string
+		Version          string
+		Dimension        string
+		Q                *dataset.QueryParams
+	}{
+		Ctx:              ctx,
+		UserAuthToken:    userAuthToken,
+		ServiceAuthToken: serviceAuthToken,
+		CollectionID:     collectionID,
+		ID:               id,
+		Edition:          edition,
+		Version:          version,
+		Dimension:        dimension,
+		Q:                q,
+	}
+	mock.lockGetOptions.Lock()
+	mock.calls.GetOptions = append(mock.calls.GetOptions, callInfo)
+	mock.lockGetOptions.Unlock()
+	return mock.GetOptionsFunc(ctx, userAuthToken, serviceAuthToken, collectionID, id, edition, version, dimension, q)
+}
+
+// GetOptionsCalls gets all the calls that were made to GetOptions.
+// Check the length with:
+//     len(mockedIDatasetClient.GetOptionsCalls())
+func (mock *IDatasetClientMock) GetOptionsCalls() []struct {
+	Ctx              context.Context
+	UserAuthToken    string
+	ServiceAuthToken string
+	CollectionID     string
+	ID               string
+	Edition          string
+	Version          string
+	Dimension        string
+	Q                *dataset.QueryParams
+} {
+	var calls []struct {
+		Ctx              context.Context
+		UserAuthToken    string
+		ServiceAuthToken string
+		CollectionID     string
+		ID               string
+		Edition          string
+		Version          string
+		Dimension        string
+		Q                *dataset.QueryParams
+	}
+	mock.lockGetOptions.RLock()
+	calls = mock.calls.GetOptions
+	mock.lockGetOptions.RUnlock()
 	return calls
 }
 
