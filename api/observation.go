@@ -4,12 +4,17 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
-	"github.com/ONSdigital/dp-net/request"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+
+	"github.com/ONSdigital/dp-net/request"
 
 	"github.com/ONSdigital/dp-api-clients-go/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
@@ -117,8 +122,14 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	}
 	logData["query_parameters"] = queryParameters
 
+	event := models.FilterSubmitted{
+		DatasetID: datasetID,
+		Edition:   edition,
+		Version:   version,
+	}
+
 	// retrieve observations
-	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData)
+	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData, &event, userAuthToken)
 	if err != nil {
 		log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
 		return nil, err
@@ -282,7 +293,108 @@ func getUserAuthToken(ctx context.Context) string {
 	return ""
 }
 
-func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data) ([]models.Observation, error) {
+// sortFilter by Dimension size, largest first, to make Neptune searches faster
+// The sort is done here because the sizes are retrieved from Mongo and
+// its best not to have the dp-graph library acquiring such coupling to its caller.
+var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters /*, userAuthToken string*/) {
+	nofDimensions := len(dbFilter.Dimensions)
+	if nofDimensions <= 1 {
+		return
+	}
+	// Create a slice of sorted dimension sizes
+	type dim struct {
+		index         int
+		dimensionSize int
+	}
+
+	dimSizes := make([]dim, 0, nofDimensions)
+	var dimSizesMutex sync.Mutex
+
+	// get info from mongo
+	var getErrorCount int32
+	var concurrent = 10 // limit number of go routines so as to not put too much on heap
+	var semaphoreChan = make(chan struct{}, concurrent)
+	var wg sync.WaitGroup // number of working goroutines
+
+	for i, dimension := range dbFilter.Dimensions {
+		if atomic.LoadInt32(&getErrorCount) != 0 {
+			break
+		}
+		semaphoreChan <- struct{}{} // block while full
+
+		wg.Add(1)
+
+		// Get dimension sizes in parallel
+		go func(i int, dimension *observation.Dimension) {
+			defer func() {
+				<-semaphoreChan // read to release a slot
+			}()
+
+			defer wg.Done()
+
+			// passing a 'Limit' of 0 makes GetOptions skip getting the documents
+			// and to return only what we are interested in: TotalCount
+			options, err := api.datasetClient.GetOptions(ctx,
+				"", // userAuthToken,
+				api.cfg.ServiceAuthToken,
+				"", // collectionID
+				event.DatasetID, event.Edition, event.Version, dimension.Name,
+				&dataset.QueryParams{Offset: 0, Limit: 0})
+
+			if err != nil {
+				if atomic.AddInt32(&getErrorCount, 1) <= 2 {
+					// only show a few of possibly hundreds of errors, as once someone
+					// looks into the one error they may fix all associated errors
+					logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version, "dimension name": dimension.Name}
+					log.Event(ctx, "SortFilter: GetOptions failed for dataset and dimension", log.INFO, logData)
+				}
+			} else {
+				d := dim{dimensionSize: options.TotalCount, index: i}
+				dimSizesMutex.Lock()
+				dimSizes = append(dimSizes, d)
+				dimSizesMutex.Unlock()
+			}
+		}(i, dimension)
+	}
+	wg.Wait()
+
+	if getErrorCount != 0 {
+		logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version}
+		log.Event(ctx, fmt.Sprintf("SortFilter: GetOptions failed for dataset %d times, sorting by default of 'geography' first", getErrorCount), log.INFO, logData)
+		// Frig dimension sizes and if geography is present, make it the largest (because it typically is the largest)
+		// and to retain compatibility with what the neptune dp-graph library was doing without access to information
+		// from mongo.
+		dimSizes = dimSizes[:0]
+		for i, dimension := range dbFilter.Dimensions {
+			if strings.ToLower(dimension.Name) == "geography" {
+				d := dim{dimensionSize: 999999, index: i}
+				dimSizes = append(dimSizes, d)
+			} else {
+				// Set sizes of dimensions as largest first to retain list order to improve sort speed
+				d := dim{dimensionSize: nofDimensions - i, index: i}
+				dimSizes = append(dimSizes, d)
+			}
+		}
+	}
+
+	// sort slice by number of options per dimension, smallest first
+	sort.Slice(dimSizes, func(i, j int) bool {
+		return dimSizes[i].dimensionSize < dimSizes[j].dimensionSize
+	})
+
+	sortedDimensions := make([]observation.Dimension, 0, nofDimensions)
+
+	for i := nofDimensions - 1; i >= 0; i-- { // build required return structure, largest first
+		sortedDimensions = append(sortedDimensions, *dbFilter.Dimensions[dimSizes[i].index])
+	}
+
+	// Now copy the sorted dimensions back over the original
+	for i, dimension := range sortedDimensions {
+		*dbFilter.Dimensions[i] = dimension
+	}
+}
+
+func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data, event *models.FilterSubmitted, userAuthToken string) ([]models.Observation, error) {
 
 	// Build query (observation.Filter type)
 	var dimensionFilters []*observation.Dimension
@@ -312,6 +424,8 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 	queryObject := observation.DimensionFilters{
 		Dimensions: dimensionFilters,
 	}
+
+	SortFilter(ctx, api, event, &queryObject)
 
 	logData["query_object"] = queryObject
 
