@@ -25,10 +25,13 @@ func TestConfig(t *testing.T) {
 				So(cfg, ShouldResemble, &Config{
 					BindAddr:                   ":24500",
 					HttpWriteTimeout:           60 * time.Second,
+					DefaultRequestTimeout:      10 * time.Second,
 					ServiceAuthToken:           "",
 					DatasetAPIURL:              "http://localhost:22000",
 					ObservationAPIURL:          "http://localhost:24500",
 					ZebedeeURL:                 "http://localhost:8082",
+					CantabularURL:              "localhost:8491",
+					CantabularExtURL:           "http://localhost:8492",
 					EnablePrivateEndpoints:     false,
 					DefaultObservationLimit:    10000,
 					GracefulShutdownTimeout:    5 * time.Second,

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ONSdigital/dp-api-clients-go/v2/cantabular"
 	"github.com/ONSdigital/dp-graph/v2/graph"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
@@ -87,4 +88,16 @@ func (e *Init) DoGetHealthCheck(cfg *config.Config, buildTime, gitCommit, versio
 	}
 	hc := healthcheck.New(versionInfo, cfg.HealthCheckCriticalTimeout, cfg.HealthCheckInterval)
 	return &hc, nil
+}
+
+func (e *ExternalServiceList) GetCantabularClient(ctx context.Context, cfg *config.Config) CantabularClient {
+	return cantabular.NewClient(
+		cantabular.Config{
+			Host:           cfg.CantabularURL,
+			ExtApiHost:     cfg.CantabularExtURL,
+			GraphQLTimeout: cfg.DefaultRequestTimeout,
+		},
+		dpHTTP.NewClient(),
+		nil,
+	)
 }

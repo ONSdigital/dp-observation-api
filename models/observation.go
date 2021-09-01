@@ -1,6 +1,6 @@
 package models
 
-import "github.com/ONSdigital/dp-api-clients-go/dataset"
+import "github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 
 const wildcard = "*"
 
