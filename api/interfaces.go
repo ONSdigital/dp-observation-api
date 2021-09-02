@@ -14,6 +14,7 @@ import (
 //go:generate moq -out mock/graph.go -pkg mock . IGraph
 //go:generate moq -out mock/dataset.go -pkg mock . IDatasetClient
 //go:generate moq -out mock/authorisation.go -pkg mock . IAuthHandler
+//go:generate moq -out mock/cantabular.go -pkg mock . CantabularClient
 
 // IGraph defines the required methods from GraphDB required by Observation API
 type IGraph interface {
@@ -33,4 +34,8 @@ type IDatasetClient interface {
 // IAuthHandler represents the required methods from authorisation library by Observation API
 type IAuthHandler interface {
 	Require(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc
+}
+
+type CantabularClient interface {
+	Checker(context.Context, *healthcheck.CheckState) error
 }

@@ -77,6 +77,8 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		dcMock := &mock.IDatasetClientMock{
 			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
 				return dataset.DatasetDetails{
@@ -111,7 +113,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
@@ -206,6 +208,8 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		graphDBMock := &mock.IGraphMock{
 			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
 				return mockRowReader, nil
@@ -224,7 +228,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
@@ -250,9 +254,11 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -272,10 +278,12 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -298,10 +306,12 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -322,9 +332,11 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -347,10 +359,12 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -374,6 +388,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		pMock := &mock.IAuthHandlerMock{
 			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
 				r = r.WithContext(context.WithValue(r.Context(), request.UserIdentityKey, testUserAuthToken))
@@ -387,7 +403,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		cfg.EnablePrivateEndpoints = true
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, pMock)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, pMock)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -427,6 +443,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		originalFunc := api.SortFilter
 		defer func() {
 			api.SortFilter = originalFunc
@@ -436,7 +454,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -462,9 +480,11 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -506,6 +526,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		originalFunc := api.SortFilter
 		defer func() {
 			api.SortFilter = originalFunc
@@ -515,7 +537,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 		ap.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -541,9 +563,11 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -569,9 +593,12 @@ func TestGetObservationsReturnsError(t *testing.T) {
 				}, nil
 			},
 		}
+
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -599,9 +626,11 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -628,6 +657,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		graphDBMock := &mock.IGraphMock{
 			StreamCSVRowsFunc: func(context.Context, string, string, *observation.DimensionFilters, *int) (observation.StreamRowReader, error) {
 				return nil, errs.ErrObservationsNotFound
@@ -643,7 +674,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -696,10 +727,12 @@ func TestGetObservationsReturnsError(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -981,11 +1014,13 @@ func TestSortFilter(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
@@ -1022,11 +1057,13 @@ func TestSortFilter(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
@@ -1079,11 +1116,13 @@ func TestSortFilter(t *testing.T) {
 			},
 		}
 
+		cMock := &mock.CantabularClientMock{}
+
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)

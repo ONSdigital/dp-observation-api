@@ -2,12 +2,13 @@ package api_test
 
 import (
 	"context"
-	"github.com/ONSdigital/dp-net/request"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/ONSdigital/dp-net/request"
 
 	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-observation-api/api"
@@ -35,8 +36,9 @@ func TestSetup(t *testing.T) {
 		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
+		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -48,6 +50,7 @@ func TestSetup(t *testing.T) {
 		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
+		cMock := &mock.CantabularClientMock{}
 		pMock := &mock.IAuthHandlerMock{
 			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +58,7 @@ func TestSetup(t *testing.T) {
 				}
 			},
 		}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -69,8 +72,9 @@ func TestClose(t *testing.T) {
 		So(err, ShouldBeNil)
 		graphDBMock := &mock.IGraphMock{}
 		dcMock := &mock.IDatasetClientMock{}
+		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, pMock)
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := api.Close(testContext)
@@ -87,11 +91,11 @@ func hasRoute(r *mux.Router, path, method string) bool {
 }
 
 // GetAPIWithMocks also used in other tests
-func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDatasetClient, pMock api.IAuthHandler) *api.API {
+func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDatasetClient, cMock api.CantabularClient, pMock api.IAuthHandler) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
 	cfg.ServiceAuthToken = testServiceAuthToken
-	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, pMock)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, cMock, pMock)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {

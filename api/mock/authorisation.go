@@ -16,19 +16,19 @@ var _ api.IAuthHandler = &IAuthHandlerMock{}
 
 // IAuthHandlerMock is a mock implementation of api.IAuthHandler.
 //
-//     func TestSomethingThatUsesIAuthHandler(t *testing.T) {
+// 	func TestSomethingThatUsesIAuthHandler(t *testing.T) {
 //
-//         // make and configure a mocked api.IAuthHandler
-//         mockedIAuthHandler := &IAuthHandlerMock{
-//             RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
-// 	               panic("mock out the Require method")
-//             },
-//         }
+// 		// make and configure a mocked api.IAuthHandler
+// 		mockedIAuthHandler := &IAuthHandlerMock{
+// 			RequireFunc: func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc {
+// 				panic("mock out the Require method")
+// 			},
+// 		}
 //
-//         // use mockedIAuthHandler in code that requires api.IAuthHandler
-//         // and then make assertions.
+// 		// use mockedIAuthHandler in code that requires api.IAuthHandler
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type IAuthHandlerMock struct {
 	// RequireFunc mocks the Require method.
 	RequireFunc func(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc

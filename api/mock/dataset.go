@@ -5,7 +5,7 @@ package mock
 
 import (
 	"context"
-	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
+	dataset "github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"sync"
@@ -17,28 +17,28 @@ var _ api.IDatasetClient = &IDatasetClientMock{}
 
 // IDatasetClientMock is a mock implementation of api.IDatasetClient.
 //
-//     func TestSomethingThatUsesIDatasetClient(t *testing.T) {
+// 	func TestSomethingThatUsesIDatasetClient(t *testing.T) {
 //
-//         // make and configure a mocked api.IDatasetClient
-//         mockedIDatasetClient := &IDatasetClientMock{
-//             CheckerFunc: func(ctx context.Context, check *healthcheck.CheckState) error {
-// 	               panic("mock out the Checker method")
-//             },
-//             GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
-// 	               panic("mock out the Get method")
-//             },
-//             GetOptionsFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, id string, edition string, version string, dimension string, q *dataset.QueryParams) (dataset.Options, error) {
-// 	               panic("mock out the GetOptions method")
-//             },
-//             GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
-// 	               panic("mock out the GetVersion method")
-//             },
-//         }
+// 		// make and configure a mocked api.IDatasetClient
+// 		mockedIDatasetClient := &IDatasetClientMock{
+// 			CheckerFunc: func(ctx context.Context, check *healthcheck.CheckState) error {
+// 				panic("mock out the Checker method")
+// 			},
+// 			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+// 				panic("mock out the Get method")
+// 			},
+// 			GetOptionsFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, id string, edition string, version string, dimension string, q *dataset.QueryParams) (dataset.Options, error) {
+// 				panic("mock out the GetOptions method")
+// 			},
+// 			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+// 				panic("mock out the GetVersion method")
+// 			},
+// 		}
 //
-//         // use mockedIDatasetClient in code that requires api.IDatasetClient
-//         // and then make assertions.
+// 		// use mockedIDatasetClient in code that requires api.IDatasetClient
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type IDatasetClientMock struct {
 	// CheckerFunc mocks the Checker method.
 	CheckerFunc func(ctx context.Context, check *healthcheck.CheckState) error

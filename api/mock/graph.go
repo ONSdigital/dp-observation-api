@@ -17,31 +17,31 @@ var _ api.IGraph = &IGraphMock{}
 
 // IGraphMock is a mock implementation of api.IGraph.
 //
-//     func TestSomethingThatUsesIGraph(t *testing.T) {
+// 	func TestSomethingThatUsesIGraph(t *testing.T) {
 //
-//         // make and configure a mocked api.IGraph
-//         mockedIGraph := &IGraphMock{
-//             CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error {
-// 	               panic("mock out the Checker method")
-//             },
-//             CloseFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Close method")
-//             },
-//             ErrorChanFunc: func() chan error {
-// 	               panic("mock out the ErrorChan method")
-//             },
-//             HealthcheckFunc: func() (string, error) {
-// 	               panic("mock out the Healthcheck method")
-//             },
-//             StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
-// 	               panic("mock out the StreamCSVRows method")
-//             },
-//         }
+// 		// make and configure a mocked api.IGraph
+// 		mockedIGraph := &IGraphMock{
+// 			CheckerFunc: func(ctx context.Context, state *healthcheck.CheckState) error {
+// 				panic("mock out the Checker method")
+// 			},
+// 			CloseFunc: func(ctx context.Context) error {
+// 				panic("mock out the Close method")
+// 			},
+// 			ErrorChanFunc: func() chan error {
+// 				panic("mock out the ErrorChan method")
+// 			},
+// 			HealthcheckFunc: func() (string, error) {
+// 				panic("mock out the Healthcheck method")
+// 			},
+// 			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
+// 				panic("mock out the StreamCSVRows method")
+// 			},
+// 		}
 //
-//         // use mockedIGraph in code that requires api.IGraph
-//         // and then make assertions.
+// 		// use mockedIGraph in code that requires api.IGraph
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type IGraphMock struct {
 	// CheckerFunc mocks the Checker method.
 	CheckerFunc func(ctx context.Context, state *healthcheck.CheckState) error

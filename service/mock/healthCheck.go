@@ -17,28 +17,28 @@ var _ service.IHealthCheck = &IHealthCheckMock{}
 
 // IHealthCheckMock is a mock implementation of service.IHealthCheck.
 //
-//     func TestSomethingThatUsesIHealthCheck(t *testing.T) {
+// 	func TestSomethingThatUsesIHealthCheck(t *testing.T) {
 //
-//         // make and configure a mocked service.IHealthCheck
-//         mockedIHealthCheck := &IHealthCheckMock{
-//             AddCheckFunc: func(name string, checker healthcheck.Checker) error {
-// 	               panic("mock out the AddCheck method")
-//             },
-//             HandlerFunc: func(w http.ResponseWriter, req *http.Request)  {
-// 	               panic("mock out the Handler method")
-//             },
-//             StartFunc: func(ctx context.Context)  {
-// 	               panic("mock out the Start method")
-//             },
-//             StopFunc: func()  {
-// 	               panic("mock out the Stop method")
-//             },
-//         }
+// 		// make and configure a mocked service.IHealthCheck
+// 		mockedIHealthCheck := &IHealthCheckMock{
+// 			AddCheckFunc: func(name string, checker healthcheck.Checker) error {
+// 				panic("mock out the AddCheck method")
+// 			},
+// 			HandlerFunc: func(w http.ResponseWriter, req *http.Request)  {
+// 				panic("mock out the Handler method")
+// 			},
+// 			StartFunc: func(ctx context.Context)  {
+// 				panic("mock out the Start method")
+// 			},
+// 			StopFunc: func()  {
+// 				panic("mock out the Stop method")
+// 			},
+// 		}
 //
-//         // use mockedIHealthCheck in code that requires service.IHealthCheck
-//         // and then make assertions.
+// 		// use mockedIHealthCheck in code that requires service.IHealthCheck
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type IHealthCheckMock struct {
 	// AddCheckFunc mocks the AddCheck method.
 	AddCheckFunc func(name string, checker healthcheck.Checker) error

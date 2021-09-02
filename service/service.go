@@ -69,7 +69,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	hc.Start(ctx)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, permissions)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions)
 
 	// Run the http server in a new go-routine
 	go func() {
