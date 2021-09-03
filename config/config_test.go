@@ -25,7 +25,7 @@ func TestConfig(t *testing.T) {
 				So(cfg, ShouldResemble, &Config{
 					BindAddr:                   ":24500",
 					HttpWriteTimeout:           60 * time.Second,
-					DefaultRequestTimeout:      10 * time.Second,
+					CantabularRequestTimeout:   10 * time.Second,
 					ServiceAuthToken:           "",
 					DatasetAPIURL:              "http://localhost:22000",
 					ObservationAPIURL:          "http://localhost:24500",

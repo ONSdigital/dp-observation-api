@@ -10,7 +10,7 @@ import (
 type Config struct {
 	BindAddr                   string        `envconfig:"BIND_ADDR"`
 	HttpWriteTimeout           time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
-	DefaultRequestTimeout      time.Duration `envconfig:"DEFAULT_REQUEST_TIMEOUT"`
+	CantabularRequestTimeout   time.Duration `envconfig:"CANTABULAR_REQUEST_TIMEOUT`
 	ServiceAuthToken           string        `envconfig:"SERVICE_AUTH_TOKEN"`
 	DatasetAPIURL              string        `envconfig:"DATASET_API_URL"`
 	ObservationAPIURL          string        `envconfig:"OBSERVATION_API_URL"`
@@ -36,7 +36,7 @@ func Get() (*Config, error) {
 	cfg := &Config{
 		BindAddr:                   ":24500",
 		HttpWriteTimeout:           60 * time.Second,
-		DefaultRequestTimeout:      10 * time.Second,
+		CantabularRequestTimeout:   10 * time.Second,
 		ServiceAuthToken:           "",
 		DatasetAPIURL:              "http://localhost:22000",
 		ObservationAPIURL:          "http://localhost:24500",

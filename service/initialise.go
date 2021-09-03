@@ -95,7 +95,7 @@ func (e *ExternalServiceList) GetCantabularClient(ctx context.Context, cfg *conf
 		cantabular.Config{
 			Host:           cfg.CantabularURL,
 			ExtApiHost:     cfg.CantabularExtURL,
-			GraphQLTimeout: cfg.DefaultRequestTimeout,
+			GraphQLTimeout: cfg.CantabularRequestTimeout,
 		},
 		dpHTTP.NewClient(),
 		nil,
