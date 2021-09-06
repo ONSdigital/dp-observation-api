@@ -36,7 +36,6 @@ var (
 
 func TestGetObservationsReturnsOK(t *testing.T) {
 
-	t.Parallel()
 	Convey("Given a request to get a single observation for a version of a dataset returns 200 OK response", t, func() {
 
 		dimensions := []dataset.VersionDimension{
@@ -242,7 +241,6 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 }
 
 func TestGetObservationsReturnsError(t *testing.T) {
-	t.Parallel()
 	Convey("When the api cannot connect to dataset api return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
@@ -744,7 +742,6 @@ func TestGetObservationsReturnsError(t *testing.T) {
 }
 
 func TestGetListOfValidDimensionNames(t *testing.T) {
-	t.Parallel()
 	Convey("Given a list of valid dimension codelist objects", t, func() {
 		Convey("When getListOfValidDimensionNames is called", func() {
 			dimension1 := dataset.VersionDimension{
@@ -776,7 +773,6 @@ func TestGetListOfValidDimensionNames(t *testing.T) {
 }
 
 func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
-	t.Parallel()
 	Convey("Given the version headers are valid", t, func() {
 		Convey("When the version has no metadata headers", func() {
 			version := &dataset.Version{
@@ -867,7 +863,6 @@ func TestGetDimensionOffsetInHeaderRow(t *testing.T) {
 }
 
 func TestExtractQueryParameters(t *testing.T) {
-	t.Parallel()
 	Convey("Given a list of valid dimension headers for version", t, func() {
 		headers := []string{
 			"time",
