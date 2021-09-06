@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
-	"github.com/ONSdigital/dp-api-clients-go/dataset"
-	"github.com/ONSdigital/dp-api-clients-go/zebedee"
+
+	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
+	"github.com/ONSdigital/dp-api-clients-go/v2/zebedee"
 	"github.com/ONSdigital/dp-authorisation/auth"
 	rchttp "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
@@ -23,6 +24,7 @@ type Service struct {
 	healthCheck        IHealthCheck
 	graphDB            api.IGraph
 	graphErrorConsumer Closer
+	cantabularClient   CantabularClient
 }
 
 // Run the service with its dependencies
@@ -48,6 +50,8 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	// Get dataset API client
 	datasetAPICli := dataset.NewAPIClient(cfg.DatasetAPIURL)
 
+	cantabularClient := serviceList.GetCantabularClient(ctx, cfg)
+
 	// Get permissions for private endpoints
 	permissions := getAuthorisationHandler(ctx, *cfg)
 
@@ -57,7 +61,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, zebedeeCli, datasetAPICli, cfg.EnablePrivateEndpoints); err != nil {
+	if err := registerCheckers(ctx, hc, graphDB, zebedeeCli, datasetAPICli, cantabularClient, cfg.EnablePrivateEndpoints); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -65,7 +69,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	hc.Start(ctx)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, permissions)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions)
 
 	// Run the http server in a new go-routine
 	go func() {
@@ -83,6 +87,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 		serviceList:        serviceList,
 		graphDB:            graphDB,
 		graphErrorConsumer: graphErrorConsumer,
+		cantabularClient:   cantabularClient,
 	}, nil
 }
 
@@ -171,6 +176,7 @@ func registerCheckers(ctx context.Context,
 	graphDB api.IGraph,
 	zebedeeCli *zebedee.Client,
 	datasetAPICli api.IDatasetClient,
+	cantabularClient CantabularClient,
 	enablePrivateEndpoints bool) (err error) {
 
 	hasErrors := false
@@ -190,6 +196,11 @@ func registerCheckers(ctx context.Context,
 	if err = hc.AddCheck("Dataset API", datasetAPICli.Checker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
+	}
+
+	if err := hc.AddCheck("cantabular client", cantabularClient.Checker); err != nil {
+		hasErrors = true
+		log.Event(ctx, "error adding check for cantabular client", log.ERROR, log.Error(err))
 	}
 
 	if hasErrors {

@@ -15,22 +15,22 @@ var _ service.IServer = &IServerMock{}
 
 // IServerMock is a mock implementation of service.IServer.
 //
-//     func TestSomethingThatUsesIServer(t *testing.T) {
+// 	func TestSomethingThatUsesIServer(t *testing.T) {
 //
-//         // make and configure a mocked service.IServer
-//         mockedIServer := &IServerMock{
-//             ListenAndServeFunc: func() error {
-// 	               panic("mock out the ListenAndServe method")
-//             },
-//             ShutdownFunc: func(ctx context.Context) error {
-// 	               panic("mock out the Shutdown method")
-//             },
-//         }
+// 		// make and configure a mocked service.IServer
+// 		mockedIServer := &IServerMock{
+// 			ListenAndServeFunc: func() error {
+// 				panic("mock out the ListenAndServe method")
+// 			},
+// 			ShutdownFunc: func(ctx context.Context) error {
+// 				panic("mock out the Shutdown method")
+// 			},
+// 		}
 //
-//         // use mockedIServer in code that requires service.IServer
-//         // and then make assertions.
+// 		// use mockedIServer in code that requires service.IServer
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type IServerMock struct {
 	// ListenAndServeFunc mocks the ListenAndServe method.
 	ListenAndServeFunc func() error

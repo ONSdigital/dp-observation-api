@@ -12,17 +12,24 @@ const (
 
 // A list of reusable states across application
 const (
+	CreatedState          = "created"
+	SubmittedState        = "submitted"
 	CompletedState        = "completed"
 	EditionConfirmedState = "edition-confirmed"
 	AssociatedState       = "associated"
 	PublishedState        = "published"
+	DetachedState         = "detached"
+	FailedState           = "failed"
 )
 
 var validDatasetStates = map[string]int{
+	CreatedState:          1,
+	SubmittedState:        1,
 	CompletedState:        1,
 	EditionConfirmedState: 1,
 	AssociatedState:       1,
 	PublishedState:        1,
+	FailedState:           1,
 }
 
 var validVersionStates = map[string]int{

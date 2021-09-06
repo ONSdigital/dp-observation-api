@@ -39,3 +39,7 @@ type IHealthCheck interface {
 type Closer interface {
 	Close(ctx context.Context) error
 }
+
+type CantabularClient interface {
+	Checker(context.Context, *healthcheck.CheckState) error
+}

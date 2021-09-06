@@ -19,25 +19,25 @@ var _ service.Initialiser = &InitialiserMock{}
 
 // InitialiserMock is a mock implementation of service.Initialiser.
 //
-//     func TestSomethingThatUsesInitialiser(t *testing.T) {
+// 	func TestSomethingThatUsesInitialiser(t *testing.T) {
 //
-//         // make and configure a mocked service.Initialiser
-//         mockedInitialiser := &InitialiserMock{
-//             DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
-// 	               panic("mock out the DoGetGraphDB method")
-//             },
-//             DoGetHTTPServerFunc: func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
-// 	               panic("mock out the DoGetHTTPServer method")
-//             },
-//             DoGetHealthCheckFunc: func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
-// 	               panic("mock out the DoGetHealthCheck method")
-//             },
-//         }
+// 		// make and configure a mocked service.Initialiser
+// 		mockedInitialiser := &InitialiserMock{
+// 			DoGetGraphDBFunc: func(ctx context.Context) (api.IGraph, service.Closer, error) {
+// 				panic("mock out the DoGetGraphDB method")
+// 			},
+// 			DoGetHTTPServerFunc: func(bindAddr string, httpWriteTimeout time.Duration, router http.Handler) service.IServer {
+// 				panic("mock out the DoGetHTTPServer method")
+// 			},
+// 			DoGetHealthCheckFunc: func(cfg *config.Config, buildTime string, gitCommit string, version string) (service.IHealthCheck, error) {
+// 				panic("mock out the DoGetHealthCheck method")
+// 			},
+// 		}
 //
-//         // use mockedInitialiser in code that requires service.Initialiser
-//         // and then make assertions.
+// 		// use mockedInitialiser in code that requires service.Initialiser
+// 		// and then make assertions.
 //
-//     }
+// 	}
 type InitialiserMock struct {
 	// DoGetGraphDBFunc mocks the DoGetGraphDB method.
 	DoGetGraphDBFunc func(ctx context.Context) (api.IGraph, service.Closer, error)

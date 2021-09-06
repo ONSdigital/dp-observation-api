@@ -13,21 +13,23 @@ import (
 
 //API provides a struct to wrap the api around
 type API struct {
-	cfg           *config.Config
-	Router        *mux.Router
-	graphDB       IGraph
-	datasetClient IDatasetClient
-	permissions   IAuthHandler
+	cfg              *config.Config
+	Router           *mux.Router
+	graphDB          IGraph
+	datasetClient    IDatasetClient
+	cantabularClient CantabularClient
+	permissions      IAuthHandler
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, permissions IAuthHandler) *API {
+func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, cantabularClient CantabularClient, permissions IAuthHandler) *API {
 	api := &API{
-		cfg:           cfg,
-		Router:        r,
-		graphDB:       graphDB,
-		datasetClient: datasetClient,
-		permissions:   permissions,
+		cfg:              cfg,
+		Router:           r,
+		graphDB:          graphDB,
+		datasetClient:    datasetClient,
+		cantabularClient: cantabularClient,
+		permissions:      permissions,
 	}
 
 	if api.cfg.EnablePrivateEndpoints {
