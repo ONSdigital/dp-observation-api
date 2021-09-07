@@ -7,7 +7,7 @@ import (
 	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-net/request"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/log.go/log"
+	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/gorilla/mux"
 )
 
@@ -67,6 +67,6 @@ func setJSONContentType(w http.ResponseWriter) {
 
 // Close is called during graceful shutdown to give the API an opportunity to perform any required disposal task
 func (*API) Close(ctx context.Context) error {
-	log.Event(ctx, "graceful shutdown of api complete", log.INFO)
+	log.Info(ctx, "graceful shutdown of api complete")
 	return nil
 }
