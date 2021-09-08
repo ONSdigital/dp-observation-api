@@ -23,7 +23,7 @@ import (
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/config"
 	"github.com/ONSdigital/dp-observation-api/models"
-	"github.com/ONSdigital/log.go/log"
+	"github.com/ONSdigital/log.go/v2/log"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -937,12 +937,12 @@ func TestExtractQueryParameters(t *testing.T) {
 func getTestData(ctx context.Context, filename string) string {
 	jsonBytes, err := ioutil.ReadFile("./observation_test_data/" + filename + ".json")
 	if err != nil {
-		log.Event(ctx, "unable to read json file into bytes", log.ERROR, log.Error(err), log.Data{"filename": filename})
+		log.Error(ctx, "unable to read json file into bytes", err, log.Data{"filename": filename})
 		os.Exit(1)
 	}
 	buffer := new(bytes.Buffer)
 	if err := json.Compact(buffer, jsonBytes); err != nil {
-		log.Event(ctx, "unable to remove whitespace from json bytes", log.ERROR, log.Error(err), log.Data{"filename": filename})
+		log.Error(ctx, "unable to remove whitespace from json bytes", err, log.Data{"filename": filename})
 		os.Exit(1)
 	}
 

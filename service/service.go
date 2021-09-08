@@ -2,14 +2,16 @@ package service
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-api-clients-go/v2/zebedee"
 	"github.com/ONSdigital/dp-authorisation/auth"
+	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	rchttp "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
-	"github.com/ONSdigital/log.go/log"
+	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
@@ -29,9 +31,9 @@ type Service struct {
 
 // Run the service with its dependencies
 func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceList, buildTime, gitCommit, version string, svcErrors chan error) (*Service, error) {
-	log.Event(ctx, "running service", log.INFO)
+	log.Info(ctx, "running service")
 
-	log.Event(ctx, "got service configuration", log.Data{"config": cfg}, log.INFO)
+	log.Info(ctx, "got service configuration", log.Data{"config": cfg})
 
 	// Get HTTP Server
 	r := mux.NewRouter()
@@ -40,7 +42,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	// Get graphDB connection for observation store
 	graphDB, graphErrorConsumer, err := serviceList.GetGraphDB(ctx)
 	if err != nil {
-		log.Event(ctx, "failed to initialise graph driver", log.FATAL, log.Error(err))
+		log.Fatal(ctx, "failed to initialise graph driver", err)
 		return nil, err
 	}
 
@@ -58,10 +60,10 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
 	if err != nil {
-		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
+		log.Fatal(ctx, "could not instantiate healthcheck", err)
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, zebedeeCli, datasetAPICli, cantabularClient, cfg.EnablePrivateEndpoints); err != nil {
+	if err := registerCheckers(ctx, cfg, hc, graphDB, zebedeeCli, datasetAPICli, cantabularClient, cfg.EnablePrivateEndpoints); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -94,7 +96,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 // Close gracefully shuts the service down in the required order, with timeout
 func (svc *Service) Close(ctx context.Context) error {
 	timeout := svc.config.GracefulShutdownTimeout
-	log.Event(ctx, "commencing graceful shutdown", log.Data{"graceful_shutdown_timeout": timeout}, log.INFO)
+	log.Info(ctx, "commencing graceful shutdown", log.Data{"graceful_shutdown_timeout": timeout})
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 
 	// track shutdown gracefully closes app
@@ -112,24 +114,24 @@ func (svc *Service) Close(ctx context.Context) error {
 		// stop any incoming requests before closing any outbound connections
 		if svc.serviceList.HTTPServer {
 			if err := svc.server.Shutdown(ctx); err != nil {
-				log.Event(ctx, "failed to shutdown http server", log.Error(err), log.ERROR)
+				log.Error(ctx, "failed to shutdown http server", err)
 			}
 		}
 
 		// close API
 		if err := svc.api.Close(ctx); err != nil {
-			log.Event(ctx, "error closing API", log.Error(err), log.ERROR)
+			log.Error(ctx, "error closing API", err)
 		}
 
 		// close graph database
 		if svc.serviceList.Graph {
 			if err := svc.graphDB.Close(ctx); err != nil {
-				log.Event(ctx, "failed to close graph db", log.ERROR, log.Error(err))
+				log.Error(ctx, "failed to close graph db", err)
 				hasShutdownError = true
 			}
 
 			if err := svc.graphErrorConsumer.Close(ctx); err != nil {
-				log.Event(ctx, "failed to close graph db error consumer", log.ERROR, log.Error(err))
+				log.Error(ctx, "failed to close graph db error consumer", err)
 				hasShutdownError = true
 			}
 		}
@@ -144,22 +146,22 @@ func (svc *Service) Close(ctx context.Context) error {
 
 	if !gracefulShutdown {
 		err := errors.New("failed to shutdown gracefully")
-		log.Event(ctx, "failed to shutdown gracefully ", log.ERROR, log.Error(err))
+		log.Error(ctx, "failed to shutdown gracefully ", err)
 		return err
 	}
 
-	log.Event(ctx, "graceful shutdown was successful", log.INFO)
+	log.Info(ctx, "graceful shutdown was successful")
 	return nil
 }
 
 // getAuthorisationHandler retrieves auth handler to authorise request
 func getAuthorisationHandler(ctx context.Context, cfg config.Config) api.IAuthHandler {
 	if !cfg.EnablePrivateEndpoints {
-		log.Event(ctx, "feature flag to not enable private endpoints, nop auth impl", log.INFO, log.Data{"feature": "ENABLE_PRIVATE_ENDPOINTS"})
+		log.Info(ctx, "feature flag to not enable private endpoints, nop auth impl", log.Data{"feature": "ENABLE_PRIVATE_ENDPOINTS"})
 		return &auth.NopHandler{}
 	}
 
-	log.Event(ctx, "feature flag enabled", log.INFO, log.Data{"feature": "ENABLE_PERMISSIONS_AUTH"})
+	log.Info(ctx, "feature flag enabled", log.Data{"feature": "ENABLE_PERMISSIONS_AUTH"})
 	auth.LoggerNamespace("dp-observation-api-auth")
 
 	// for checking caller permissions when we only have a user/service token
@@ -172,6 +174,7 @@ func getAuthorisationHandler(ctx context.Context, cfg config.Config) api.IAuthHa
 
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
 func registerCheckers(ctx context.Context,
+	cfg *config.Config,
 	hc IHealthCheck,
 	graphDB api.IGraph,
 	zebedeeCli *zebedee.Client,
@@ -184,23 +187,30 @@ func registerCheckers(ctx context.Context,
 	if enablePrivateEndpoints {
 		if err = hc.AddCheck("Zebedee", zebedeeCli.Checker); err != nil {
 			hasErrors = true
-			log.Event(ctx, "error adding check for zebedee", log.ERROR, log.Error(err))
+			log.Error(ctx, "error adding check for zebedee", err)
 		}
 	}
 
 	if err = hc.AddCheck("Graph DB", graphDB.Checker); err != nil {
 		hasErrors = true
-		log.Event(ctx, "error adding check for graph db", log.ERROR, log.Error(err))
+		log.Error(ctx, "error adding check for graph db", err)
 	}
 
 	if err = hc.AddCheck("Dataset API", datasetAPICli.Checker); err != nil {
 		hasErrors = true
-		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
+		log.Error(ctx, "error adding check for dataset api", err)
 	}
 
-	if err := hc.AddCheck("cantabular client", cantabularClient.Checker); err != nil {
+	cantabularChecker := cantabularClient.Checker
+	if !cfg.CantabularHealthcheckEnabled {
+		cantabularChecker = func(ctx context.Context, state *healthcheck.CheckState) error {
+			state.Update(healthcheck.StatusOK, "Cantabular healthcheck placeholder", http.StatusOK)
+			return nil
+		}
+	}
+	if err := hc.AddCheck("cantabular client", cantabularChecker); err != nil {
 		hasErrors = true
-		log.Event(ctx, "error adding check for cantabular client", log.ERROR, log.Error(err))
+		log.Error(ctx, "error adding check for cantabular client", err)
 	}
 
 	if hasErrors {
