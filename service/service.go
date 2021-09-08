@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-api-clients-go/v2/zebedee"
 	"github.com/ONSdigital/dp-authorisation/auth"
+	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	rchttp "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
@@ -61,7 +63,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 		log.Event(ctx, "could not instantiate healthcheck", log.FATAL, log.Error(err))
 		return nil, err
 	}
-	if err := registerCheckers(ctx, hc, graphDB, zebedeeCli, datasetAPICli, cantabularClient, cfg.EnablePrivateEndpoints); err != nil {
+	if err := registerCheckers(ctx, cfg, hc, graphDB, zebedeeCli, datasetAPICli, cantabularClient, cfg.EnablePrivateEndpoints); err != nil {
 		return nil, errors.Wrap(err, "unable to register checkers")
 	}
 
@@ -171,7 +173,7 @@ func getAuthorisationHandler(ctx context.Context, cfg config.Config) api.IAuthHa
 }
 
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
-func registerCheckers(ctx context.Context,
+func registerCheckers(ctx context.Context, cfg *config.Config,
 	hc IHealthCheck,
 	graphDB api.IGraph,
 	zebedeeCli *zebedee.Client,
@@ -198,7 +200,14 @@ func registerCheckers(ctx context.Context,
 		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
 	}
 
-	if err := hc.AddCheck("cantabular client", cantabularClient.Checker); err != nil {
+	cantabularChecker := cantabularClient.Checker
+	if !cfg.CantabularHealthcheckEnabled {
+		cantabularChecker = func(ctx context.Context, state *healthcheck.CheckState) error {
+			state.Update(healthcheck.StatusOK, "Cantabular healthcheck placeholder", http.StatusOK)
+			return nil
+		}
+	}
+	if err := hc.AddCheck("cantabular client", cantabularChecker); err != nil {
 		hasErrors = true
 		log.Event(ctx, "error adding check for cantabular client", log.ERROR, log.Error(err))
 	}
