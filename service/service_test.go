@@ -140,7 +140,7 @@ func TestRunPrivate(t *testing.T) {
 			})
 
 			Convey("The checkers are registered and the healthcheck and http server started", func() {
-				So(len(hcMock.AddCheckCalls()), ShouldEqual, 4)
+				So(len(hcMock.AddCheckCalls()), ShouldEqual, 3)
 				So(hcMock.AddCheckCalls()[0].Name, ShouldResemble, "Zebedee")
 				So(hcMock.AddCheckCalls()[1].Name, ShouldResemble, "Graph DB")
 				So(hcMock.AddCheckCalls()[2].Name, ShouldResemble, "Dataset API")
@@ -177,11 +177,10 @@ func TestRunPrivate(t *testing.T) {
 				So(err.Error(), ShouldResemble, fmt.Sprintf("unable to register checkers: %s", errAddheckFail.Error()))
 				So(svcList.Graph, ShouldBeTrue)
 				So(svcList.HealthCheck, ShouldBeTrue)
-				So(len(hcMockAddFail.AddCheckCalls()), ShouldEqual, 4)
+				So(len(hcMockAddFail.AddCheckCalls()), ShouldEqual, 3)
 				So(hcMockAddFail.AddCheckCalls()[0].Name, ShouldResemble, "Zebedee")
 				So(hcMockAddFail.AddCheckCalls()[1].Name, ShouldResemble, "Graph DB")
 				So(hcMockAddFail.AddCheckCalls()[2].Name, ShouldResemble, "Dataset API")
-				So(hcMockAddFail.AddCheckCalls()[3].Name, ShouldResemble, "cantabular client")
 			})
 		})
 	})
@@ -284,7 +283,7 @@ func TestRunPublic(t *testing.T) {
 			})
 
 			Convey("The checkers are registered and the healthcheck and http server started", func() {
-				So(len(hcMock.AddCheckCalls()), ShouldEqual, 3)
+				So(len(hcMock.AddCheckCalls()), ShouldEqual, 2)
 				So(hcMock.AddCheckCalls()[0].Name, ShouldResemble, "Graph DB")
 				So(hcMock.AddCheckCalls()[1].Name, ShouldResemble, "Dataset API")
 				So(len(initMock.DoGetHTTPServerCalls()), ShouldEqual, 1)
@@ -320,7 +319,7 @@ func TestRunPublic(t *testing.T) {
 				So(err.Error(), ShouldResemble, fmt.Sprintf("unable to register checkers: %s", errAddheckFail.Error()))
 				So(svcList.Graph, ShouldBeTrue)
 				So(svcList.HealthCheck, ShouldBeTrue)
-				So(len(hcMockAddFail.AddCheckCalls()), ShouldEqual, 3)
+				So(len(hcMockAddFail.AddCheckCalls()), ShouldEqual, 2)
 				So(hcMockAddFail.AddCheckCalls()[0].Name, ShouldResemble, "Graph DB")
 				So(hcMockAddFail.AddCheckCalls()[1].Name, ShouldResemble, "Dataset API")
 			})
