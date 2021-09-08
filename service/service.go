@@ -173,7 +173,8 @@ func getAuthorisationHandler(ctx context.Context, cfg config.Config) api.IAuthHa
 }
 
 // registerCheckers adds the Checkers to the healthcheck client, for the provided dependencies
-func registerCheckers(ctx context.Context, cfg *config.Config,
+func registerCheckers(ctx context.Context,
+	cfg *config.Config,
 	hc IHealthCheck,
 	graphDB api.IGraph,
 	zebedeeCli *zebedee.Client,
