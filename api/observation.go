@@ -21,7 +21,7 @@ import (
 	"github.com/ONSdigital/dp-observation-api/apierrors"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
-	"github.com/ONSdigital/log.go/log"
+	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 )
@@ -75,7 +75,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Event(ctx, "get observations endpoint: successfully retrieved observations relative to a selected set of dimension options for a version", log.INFO, logData)
+	log.Info(ctx, "get observations endpoint: successfully retrieved observations relative to a selected set of dimension options for a version", logData)
 }
 
 func (api *API) doGetObservations(ctx context.Context, datasetID, edition, version string, r *http.Request, logData log.Data) (*models.ObservationsDoc, error) {
@@ -89,7 +89,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	datasetDoc, err := api.getDataset(ctx, authorised, userAuthToken, datasetID, logData)
 	if err != nil {
-		log.Event(ctx, "failed to retrieve dataset doc", log.ERROR, log.Error(err))
+		log.Error(ctx, "failed to retrieve dataset doc", err)
 		return nil, err
 	}
 
@@ -100,13 +100,13 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	if err = models.CheckState(models.Version, versionDoc.State); err != nil {
 		logData["state"] = versionDoc.State
-		log.Event(ctx, "get observations: version has an invalid state", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: version has an invalid state", err, logData)
 		return nil, err
 	}
 
 	if versionDoc.Dimensions == nil {
 		logData["version_doc"] = versionDoc
-		log.Event(ctx, "get observations: missing dimensions in versio doc", log.ERROR, log.Error(errs.ErrMissingVersionDimensions), logData)
+		log.Error(ctx, "get observations: missing dimensions in versio doc", errs.ErrMissingVersionDimensions, logData)
 		return nil, errs.ErrMissingVersionDimensions
 	}
 
@@ -117,7 +117,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	// check query parameters match the version dimensions
 	queryParameters, err := ExtractQueryParameters(r.URL.Query(), validDimensionNames)
 	if err != nil {
-		log.Event(ctx, "get observations: error extracting query parameters", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: error extracting query parameters", err, logData)
 		return nil, err
 	}
 	logData["query_parameters"] = queryParameters
@@ -131,7 +131,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	// retrieve observations
 	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData, &event, userAuthToken)
 	if err != nil {
-		log.Event(ctx, "get observations: unable to retrieve observations", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: unable to retrieve observations", err, logData)
 		return nil, err
 	}
 
@@ -159,7 +159,7 @@ func (api *API) getDataset(ctx context.Context, authorised bool, userAuthToken, 
 	// Get dataset from dataset API
 	datasetDoc, err := api.datasetClient.Get(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", datasetID)
 	if err != nil {
-		log.Event(ctx, "get observations: dataset api failed to retrieve dataset document", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: dataset api failed to retrieve dataset document", err, logData)
 
 		datasetError, ok := err.(*dataset.ErrInvalidDatasetAPIResponse)
 		if !ok {
@@ -180,7 +180,7 @@ func (api *API) getDataset(ctx context.Context, authorised bool, userAuthToken, 
 	if !authorised {
 		if datasetDoc.State != dataset.StatePublished.String() {
 			logData["dataset_doc"] = datasetDoc
-			log.Event(ctx, "get observations: dataset is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			log.Error(ctx, "get observations: dataset is not in published state", errs.ErrDatasetNotFound, logData)
 			return dataset.DatasetDetails{}, errs.ErrDatasetNotFound
 		}
 	}
@@ -192,7 +192,7 @@ func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, 
 	// Get Version from dataset API
 	versionDoc, err := api.datasetClient.GetVersion(ctx, userAuthToken, api.cfg.ServiceAuthToken, "", "", datasetID, edition, version)
 	if err != nil {
-		log.Event(ctx, "get observations: dataset api failed to retrieve dataset version", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: dataset api failed to retrieve dataset version", err, logData)
 
 		datasetError, ok := err.(*dataset.ErrInvalidDatasetAPIResponse)
 		if !ok {
@@ -213,7 +213,7 @@ func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, 
 	if !authorised {
 		if versionDoc.State != dataset.StatePublished.String() {
 			logData["version_doc"] = versionDoc
-			log.Event(ctx, "get observations: dataset version is not in published state", log.ERROR, log.Error(errs.ErrDatasetNotFound), logData)
+			log.Error(ctx, "get observations: dataset version is not in published state", errs.ErrDatasetNotFound, logData)
 			return dataset.Version{}, errs.ErrVersionNotFound
 		}
 	}
@@ -346,7 +346,7 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 					// only show a few of possibly hundreds of errors, as once someone
 					// looks into the one error they may fix all associated errors
 					logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version, "dimension name": dimension.Name}
-					log.Event(ctx, "SortFilter: GetOptions failed for dataset and dimension", log.INFO, logData)
+					log.Info(ctx, "SortFilter: GetOptions failed for dataset and dimension", logData)
 				}
 			} else {
 				d := dim{dimensionSize: options.TotalCount, index: i}
@@ -360,7 +360,7 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 
 	if getErrorCount != 0 {
 		logData := log.Data{"dataset_id": event.DatasetID, "edition": event.Edition, "version": event.Version}
-		log.Event(ctx, fmt.Sprintf("SortFilter: GetOptions failed for dataset %d times, sorting by default of 'geography' first", getErrorCount), log.INFO, logData)
+		log.Info(ctx, fmt.Sprintf("SortFilter: GetOptions failed for dataset %d times, sorting by default of 'geography' first", getErrorCount), logData)
 		// Frig dimension sizes and if geography is present, make it the largest (because it typically is the largest)
 		// and to retain compatibility with what the neptune dp-graph library was doing without access to information
 		// from mongo.
@@ -429,7 +429,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 
 	logData["query_object"] = queryObject
 
-	log.Event(ctx, "query object built to retrieve observations from db", log.INFO, logData)
+	log.Info(ctx, "query object built to retrieve observations from db", logData)
 
 	csvRowReader, err := api.graphDB.StreamCSVRows(ctx, versionDoc.ID, "", &queryObject, &limit)
 	if err != nil {
@@ -450,7 +450,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 
 	dimensionOffset, err := GetDimensionOffsetInHeaderRow(headerRowArray)
 	if err != nil {
-		log.Event(ctx, "get observations: unable to distinguish headers from version document", log.ERROR, log.Error(err), logData)
+		log.Error(ctx, "get observations: unable to distinguish headers from version document", err, logData)
 		return nil, err
 	}
 
@@ -553,6 +553,6 @@ func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err
 	}
 
 	data["responseStatus"] = status
-	log.Event(ctx, "get observation endpoint: request unsuccessful", log.ERROR, log.Error(err), data)
+	log.Error(ctx, "get observation endpoint: request unsuccessful", err, data)
 	http.Error(w, resErrMsg, status)
 }
