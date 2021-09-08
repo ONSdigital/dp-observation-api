@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-api-clients-go/v2/zebedee"
 	"github.com/ONSdigital/dp-authorisation/auth"
+	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	rchttp "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-observation-api/api"
 	"github.com/ONSdigital/dp-observation-api/config"
@@ -197,11 +199,18 @@ func registerCheckers(ctx context.Context, cfg *config.Config,
 		hasErrors = true
 		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
 	}
-	if cfg.CantabularHealthcheckEnabled {
-		if err := hc.AddCheck("cantabular client", cantabularClient.Checker); err != nil {
-			hasErrors = true
-			log.Event(ctx, "error adding check for cantabular client", log.ERROR, log.Error(err))
+
+	cantabularChecker := cantabularClient.Checker
+	if !cfg.CantabularHealthcheckEnabled {
+		cantabularChecker = func(ctx context.Context, state *healthcheck.CheckState) error {
+			state.Update(healthcheck.StatusOK, "Cantabular healthcheck placeholder", http.StatusOK)
+			return nil
 		}
+	}
+
+	if err = hc.AddCheck("Dataset API", cantabularChecker); err != nil {
+		hasErrors = true
+		log.Event(ctx, "error adding check for dataset api", log.ERROR, log.Error(err))
 	}
 
 	if hasErrors {
