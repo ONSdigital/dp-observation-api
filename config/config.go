@@ -10,8 +10,8 @@ import (
 type Config struct {
 	BindAddr                     string        `envconfig:"BIND_ADDR"`
 	HttpWriteTimeout             time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
-	CantabularRequestTimeout     time.Duration `envconfig:"CANTABULAR_REQUEST_TIMEOUT`
-	ServiceAuthToken             string        `envconfig:"SERVICE_AUTH_TOKEN"`
+	CantabularRequestTimeout     time.Duration `envconfig:"CANTABULAR_REQUEST_TIMEOUT"`
+	ServiceAuthToken             string        `envconfig:"SERVICE_AUTH_TOKEN"          json:"-"`
 	DatasetAPIURL                string        `envconfig:"DATASET_API_URL"`
 	ObservationAPIURL            string        `envconfig:"OBSERVATION_API_URL"`
 	ZebedeeURL                   string        `envconfig:"ZEBEDEE_URL"`
