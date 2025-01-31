@@ -204,7 +204,11 @@ func registerCheckers(ctx context.Context,
 	cantabularChecker := cantabularClient.Checker
 	if !cfg.CantabularHealthcheckEnabled {
 		cantabularChecker = func(ctx context.Context, state *healthcheck.CheckState) error {
-			state.Update(healthcheck.StatusOK, "Cantabular healthcheck placeholder", http.StatusOK)
+			err := state.Update(healthcheck.StatusOK, "Cantabular healthcheck placeholder", http.StatusOK)
+			if err != nil {
+				log.Error(ctx, "error updating healthcheck state", err)
+				return err
+			}
 			return nil
 		}
 	}

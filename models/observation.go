@@ -90,13 +90,10 @@ func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Versi
 	for paramKey, paramValue := range queryParameters {
 		dimension, found := versionDocDimensions[paramKey]
 		if found && paramValue != wildcard {
-			var linkObjects []*dataset.Link
-
 			linkObject := &dataset.Link{
 				URL: dimension.URL + "/codes/" + paramValue,
 				ID:  paramValue,
 			}
-			linkObjects = append(linkObjects, linkObject)
 			dimensions[paramKey] = Option{
 				LinkObject: linkObject,
 			}

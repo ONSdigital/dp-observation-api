@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -935,7 +934,7 @@ func TestExtractQueryParameters(t *testing.T) {
 }
 
 func getTestData(ctx context.Context, filename string) string {
-	jsonBytes, err := ioutil.ReadFile("./observation_test_data/" + filename + ".json")
+	jsonBytes, err := os.ReadFile("./observation_test_data/" + filename + ".json")
 	if err != nil {
 		log.Error(ctx, "unable to read json file into bytes", err, log.Data{"filename": filename})
 		os.Exit(1)
