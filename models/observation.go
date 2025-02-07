@@ -55,7 +55,6 @@ type FilterSubmitted struct {
 
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
 func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Version, datasetDetails dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
-
 	selfLink := generateSelfURL(obsAPIURL, rawQuery, versionDoc)
 
 	observationsDoc := &ObservationsDoc{
@@ -82,8 +81,10 @@ func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Versi
 	var dimensions = make(map[string]Option)
 
 	versionDocDimensions := make(map[string]dataset.VersionDimension)
-	for _, dim := range versionDoc.Dimensions {
-		versionDocDimensions[dim.Name] = dim
+
+	for i := range versionDoc.Dimensions {
+		dim := &versionDoc.Dimensions[i]
+		versionDocDimensions[dim.Name] = *dim
 	}
 
 	// add the dimension codes

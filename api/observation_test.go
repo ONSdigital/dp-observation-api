@@ -27,16 +27,17 @@ import (
 )
 
 var (
-	dimension1 = dataset.VersionDimension{Name: "aggregate"}
-	dimension2 = dataset.VersionDimension{Name: "geography"}
-	dimension3 = dataset.VersionDimension{Name: "time"}
-	dimension4 = dataset.VersionDimension{Name: "age"}
+	dimension1                   = dataset.VersionDimension{Name: "aggregate"}
+	dimension2                   = dataset.VersionDimension{Name: "geography"}
+	dimension3                   = dataset.VersionDimension{Name: "time"}
+	dimension4                   = dataset.VersionDimension{Name: "age"}
+	observationAPIMockURL        = "http://localhost:8082"
+	foodObservationResponse      = "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food"
+	aggregateObservationResponse = "v4_2,data_marking,confidence_interval,time,time,geography_code,geography,aggregate_code,aggregate"
 )
 
 func TestGetObservationsReturnsOK(t *testing.T) {
-
 	Convey("Given a request to get a single observation for a version of a dataset returns 200 OK response", t, func() {
-
 		dimensions := []dataset.VersionDimension{
 			{
 				Name: "aggregate",
@@ -58,9 +59,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			ReadFunc: func() (string, error) {
 				count++
 				if count == 1 {
-					return "v4_2,data_marking,confidence_interval,time,time,geography_code,geography,aggregate_code,aggregate", nil
+					return aggregateObservationResponse, nil
 				} else if count == 2 {
-					return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+					return foodObservationResponse, nil
 				}
 				return "", io.EOF
 			},
@@ -110,11 +111,13 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
-			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
 			ap.Router.ServeHTTP(w, r)
@@ -129,7 +132,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		})
 
 		Convey("When request contains query parameters where the dimension name is in upper casing", func() {
-			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", nil)
+			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", http.NoBody)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
 			ap.Router.ServeHTTP(w, r)
@@ -145,7 +148,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 	})
 
 	Convey("A successful request to get multiple observations via a wildcard for a version of a dataset returns 200 OK response", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=*&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -170,9 +173,9 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			ReadFunc: func() (string, error) {
 				count++
 				if count == 1 {
-					return "v4_2,data_marking,confidence_interval,time,time,geography_code,geography,aggregate_code,aggregate", nil
+					return aggregateObservationResponse, nil
 				} else if count == 2 {
-					return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+					return foodObservationResponse, nil
 				} else if count == 3 {
 					return "112.1,,,Month,Aug-16,K02000001,,cpi1dim1G10101,01.2 Waste", nil
 				}
@@ -224,9 +227,10 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		cfg.ObservationAPIURL = "http://localhost:8082"
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
@@ -237,11 +241,127 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
 		So(len(mockRowReader.ReadCalls()), ShouldEqual, 4)
 	})
+
+	Convey("Given a request to get a single observation for a version of a dataset with rewriting enabled returns 200 OK response", t, func() {
+		dimensions := []dataset.VersionDimension{
+			{
+				Name: "aggregate",
+				URL:  "http://localhost:8081/code-lists/cpih1dim1aggid",
+			},
+			{
+				Name: "geography",
+				URL:  "http://localhost:8081/code-lists/uk-only",
+			},
+			{
+				Name: "time",
+				URL:  "http://localhost:8081/code-lists/time",
+			},
+		}
+		usagesNotes := &[]dataset.UsageNote{{Title: "data_marking", Note: "this marks the observation with a special character"}}
+
+		count := 0
+		mockRowReader := &observationtest.StreamRowReaderMock{
+			ReadFunc: func() (string, error) {
+				count++
+				if count == 1 {
+					return aggregateObservationResponse, nil
+				} else if count == 2 {
+					return foodObservationResponse, nil
+				}
+				return "", io.EOF
+			},
+			CloseFunc: func(context.Context) error {
+				return nil
+			},
+		}
+
+		graphDBMock := &mock.IGraphMock{
+			StreamCSVRowsFunc: func(ctx context.Context, instanceID string, filterID string, filters *observation.DimensionFilters, limit *int) (observation.StreamRowReader, error) {
+				return mockRowReader, nil
+			},
+		}
+
+		cMock := &mock.CantabularClientMock{}
+
+		dcMock := &mock.IDatasetClientMock{
+			GetFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, collectionID string, datasetID string) (dataset.DatasetDetails, error) {
+				return dataset.DatasetDetails{
+					State:      dataset.StatePublished.String(),
+					UsageNotes: usagesNotes,
+				}, nil
+			},
+			GetVersionFunc: func(ctx context.Context, userAuthToken string, serviceAuthToken string, downloadServiceAuthToken string, collectionID string, datasetID string, edition string, version string) (dataset.Version, error) {
+				return dataset.Version{
+					Dimensions: dimensions,
+					Links: dataset.Links{
+						Dataset: dataset.Link{ID: "cpih012"},
+						Edition: dataset.Link{ID: "2017"},
+						Version: dataset.Link{
+							URL: "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
+							ID:  "1",
+						},
+					},
+					State: dataset.StatePublished.String(),
+				}, nil
+			},
+		}
+
+		originalFunc := api.SortFilter
+		defer func() {
+			api.SortFilter = originalFunc
+		}()
+		api.SortFilter = func(ctx context.Context, api *api.API, event *models.FilterSubmitted, dbFilter *observation.DimensionFilters) {
+		}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := true
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+
+		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
+			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
+			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
+			r.Header.Add("X-Forwarded-Proto", "https")
+			r.Header.Add("X-Forwarded-Host", "api.example.com")
+			r.Header.Add("X-Forwarded-Path-Prefix", "v1")
+			w := httptest.NewRecorder()
+			ap.Router.ServeHTTP(w, r)
+
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithSingleObservationAndRewriting"))
+
+			validateGetDataset(dcMock, "cpih012")
+			validateGetVersion(dcMock, "cpih012", "2017", "1")
+			So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
+		})
+
+		Convey("When request contains query parameters where the dimension name is in upper casing", func() {
+			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", http.NoBody)
+			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
+			r.Header.Add("X-Forwarded-Proto", "https")
+			r.Header.Add("X-Forwarded-Host", "api.example.com")
+			r.Header.Add("X-Forwarded-Path-Prefix", "v1")
+			w := httptest.NewRecorder()
+			ap.Router.ServeHTTP(w, r)
+
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedSecondDocWithSingleObservationAndRewriting"))
+
+			validateGetDataset(dcMock, "cpih012")
+			validateGetVersion(dcMock, "cpih012", "2017", "1")
+			So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 1)
+			So(len(mockRowReader.ReadCalls()), ShouldEqual, 3)
+		})
+	})
 }
 
 func TestGetObservationsReturnsError(t *testing.T) {
 	Convey("When the api cannot connect to dataset api return an internal server error", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -255,7 +375,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -265,7 +387,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When the dataset does not exist return status not found", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -279,8 +401,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
+		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -290,7 +413,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When the dataset version does not exist return status not found", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -307,8 +430,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
+		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -319,7 +443,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When the dataset exists but is unpublished return status not found for unauthorised users", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -333,7 +457,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -343,7 +469,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When an unpublished version has an incorrect state for an edition of a dataset return not found error for unauthorised users", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -360,8 +486,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
+		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -372,7 +499,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When an unpublished version has an incorrect state return an internal error for authorised users", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -399,8 +526,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		cfg.EnablePrivateEndpoints = true
+		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, pMock)
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, pMock, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -409,13 +537,13 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When graph instance node has not got a headers field return an internal server error", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
 		mockRowReader := &observationtest.StreamRowReaderMock{
 			ReadFunc: func() (string, error) {
-				return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+				return foodObservationResponse, nil
 			},
 			CloseFunc: func(context.Context) error {
 				return nil
@@ -451,7 +579,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -462,7 +592,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When a version document has not got any dimensions field return an internal server error", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -481,7 +611,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
@@ -491,7 +623,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When the first header in array does not describe the header row correctly return internal error", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -534,7 +666,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		ap.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
@@ -544,7 +678,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When an invalid query parameter is set in request return 400 bad request with an error message containing a list of incorrect query parameters", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -564,7 +698,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -575,7 +711,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When there is a missing query parameter that is expected to be set in request return 400 bad request with an error message containing a list of missing query parameters", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -595,7 +731,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -606,7 +744,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When there are too many query parameters that are set to wildcard (*) value request returns 400 bad request", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=*&aggregate=*&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=*&aggregate=*&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -627,7 +765,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -638,7 +778,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When requested query does not find a unique observation return no observations found", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -671,7 +811,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		ap.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
@@ -683,7 +825,7 @@ func TestGetObservationsReturnsError(t *testing.T) {
 	})
 
 	Convey("When requested query has a multi-valued dimension return bad request", t, func() {
-		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001&geography=K02000002", nil)
+		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001&geography=K02000002", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 		w := httptest.NewRecorder()
 
@@ -728,8 +870,9 @@ func TestGetObservationsReturnsError(t *testing.T) {
 
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
+		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{})
+		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 		api.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -872,7 +1015,7 @@ func TestExtractQueryParameters(t *testing.T) {
 		Convey("When a request is made containing query parameters for each dimension/header", func() {
 			r, err := http.NewRequest("GET",
 				"http://localhost:22000/datasets/123/editions/2017/versions/1/observations?time=JAN08&aggregate=Overall Index&geography=wales",
-				nil,
+				http.NoBody,
 			)
 			So(err, ShouldBeNil)
 
@@ -889,7 +1032,7 @@ func TestExtractQueryParameters(t *testing.T) {
 		Convey("When a request is made containing query parameters for 2/3 dimensions/headers", func() {
 			r, err := http.NewRequest("GET",
 				"http://localhost:22000/datasets/123/editions/2017/versions/1/observations?time=JAN08&geography=wales",
-				nil,
+				http.NoBody,
 			)
 			So(err, ShouldBeNil)
 
@@ -904,7 +1047,7 @@ func TestExtractQueryParameters(t *testing.T) {
 		Convey("When a request is made containing all query parameters for each dimensions/headers but also an invalid one", func() {
 			r, err := http.NewRequest("GET",
 				"http://localhost:22000/datasets/123/editions/2017/versions/1/observations?time=JAN08&aggregate=Food&geography=wales&age=52",
-				nil,
+				http.NoBody,
 			)
 			So(err, ShouldBeNil)
 
@@ -919,7 +1062,7 @@ func TestExtractQueryParameters(t *testing.T) {
 		Convey("When a request is made containing all query parameters for each dimensions/headers but there is a duplicate", func() {
 			r, err := http.NewRequest("GET",
 				"http://localhost:22000/datasets/123/editions/2017/versions/1/observations?time=JAN08&aggregate=Food&geography=wales&time=JAN0",
-				nil,
+				http.NoBody,
 			)
 			So(err, ShouldBeNil)
 
@@ -975,7 +1118,7 @@ func TestSortFilter(t *testing.T) {
 
 	mockRowReader := &observationtest.StreamRowReaderMock{
 		ReadFunc: func() (string, error) {
-			return "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food", nil
+			return foodObservationResponse, nil
 		},
 		CloseFunc: func(context.Context) error {
 			return nil
@@ -1013,8 +1156,10 @@ func TestSortFilter(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
@@ -1056,8 +1201,10 @@ func TestSortFilter(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
@@ -1115,8 +1262,10 @@ func TestSortFilter(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 
-		cfg.ObservationAPIURL = "http://localhost:8082"
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{})
+		cfg.ObservationAPIURL = observationAPIMockURL
+		enableURLRewriting := false
+
+		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
 			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)

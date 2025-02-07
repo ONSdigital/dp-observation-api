@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -26,8 +27,9 @@ const testUserAuthToken = "testUserAuthToken"
 var ctx = context.WithValue(context.Background(), request.FlorenceIdentityKey, testUserAuthToken)
 
 var (
-	mu          sync.Mutex
-	testContext = context.Background()
+	mu                sync.Mutex
+	testContext       = context.Background()
+	observationAPIURL = &url.URL{Scheme: "http", Host: "localhost:24500"}
 )
 
 func TestSetup(t *testing.T) {
@@ -38,7 +40,8 @@ func TestSetup(t *testing.T) {
 		dcMock := &mock.IDatasetClientMock{}
 		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
+		enableURLRewriting := false
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -58,7 +61,8 @@ func TestSetup(t *testing.T) {
 				}
 			},
 		}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
+		enableURLRewriting := false
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
 			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
@@ -74,7 +78,8 @@ func TestClose(t *testing.T) {
 		dcMock := &mock.IDatasetClientMock{}
 		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock)
+		enableURLRewriting := false
+		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
 			err := api.Close(testContext)
@@ -85,17 +90,17 @@ func TestClose(t *testing.T) {
 }
 
 func hasRoute(r *mux.Router, path, method string) bool {
-	req := httptest.NewRequest(method, path, nil)
+	req := httptest.NewRequest(method, path, http.NoBody)
 	match := &mux.RouteMatch{}
 	return r.Match(req, match)
 }
 
 // GetAPIWithMocks also used in other tests
-func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDatasetClient, cMock api.CantabularClient, pMock api.IAuthHandler) *api.API {
+func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDatasetClient, cMock api.CantabularClient, pMock api.IAuthHandler, enableURLRewriting bool) *api.API {
 	mu.Lock()
 	defer mu.Unlock()
 	cfg.ServiceAuthToken = testServiceAuthToken
-	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, cMock, pMock)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting, observationAPIURL)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {

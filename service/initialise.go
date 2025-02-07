@@ -90,7 +90,7 @@ func (e *Init) DoGetHealthCheck(cfg *config.Config, buildTime, gitCommit, versio
 	return &hc, nil
 }
 
-func (e *ExternalServiceList) GetCantabularClient(ctx context.Context, cfg *config.Config) CantabularClient {
+func (e *ExternalServiceList) GetCantabularClient(_ context.Context, cfg *config.Config) CantabularClient {
 	return cantabular.NewClient(
 		cantabular.Config{
 			Host:           cfg.CantabularURL,
