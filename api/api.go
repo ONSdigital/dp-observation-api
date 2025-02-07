@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/ONSdigital/dp-authorisation/auth"
 	"github.com/ONSdigital/dp-net/request"
@@ -11,25 +12,29 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//API provides a struct to wrap the api around
+// API provides a struct to wrap the api around
 type API struct {
-	cfg              *config.Config
-	Router           *mux.Router
-	graphDB          IGraph
-	datasetClient    IDatasetClient
-	cantabularClient CantabularClient
-	permissions      IAuthHandler
+	cfg                *config.Config
+	Router             *mux.Router
+	graphDB            IGraph
+	datasetClient      IDatasetClient
+	cantabularClient   CantabularClient
+	permissions        IAuthHandler
+	enableURLRewriting bool
+	observationAPIURL  *url.URL
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, cantabularClient CantabularClient, permissions IAuthHandler) *API {
+func Setup(_ context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, cantabularClient CantabularClient, permissions IAuthHandler, enableURLRewriting bool, observationAPIURL *url.URL) *API {
 	api := &API{
-		cfg:              cfg,
-		Router:           r,
-		graphDB:          graphDB,
-		datasetClient:    datasetClient,
-		cantabularClient: cantabularClient,
-		permissions:      permissions,
+		cfg:                cfg,
+		Router:             r,
+		graphDB:            graphDB,
+		datasetClient:      datasetClient,
+		cantabularClient:   cantabularClient,
+		permissions:        permissions,
+		enableURLRewriting: enableURLRewriting,
+		observationAPIURL:  observationAPIURL,
 	}
 
 	if api.cfg.EnablePrivateEndpoints {
@@ -43,7 +48,6 @@ func Setup(ctx context.Context, r *mux.Router, cfg *config.Config, graphDB IGrap
 }
 
 func (api *API) checkIfAuthorised(r *http.Request, logData log.Data) (authorised bool) {
-
 	callerIdentity := request.Caller(r.Context())
 	if callerIdentity != "" {
 		logData["caller_identity"] = callerIdentity

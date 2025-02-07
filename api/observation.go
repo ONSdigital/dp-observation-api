@@ -15,10 +15,10 @@ import (
 	"sync/atomic"
 
 	"github.com/ONSdigital/dp-net/request"
+	"github.com/ONSdigital/dp-net/v2/links"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-graph/v2/observation"
-	"github.com/ONSdigital/dp-observation-api/apierrors"
 	errs "github.com/ONSdigital/dp-observation-api/apierrors"
 	"github.com/ONSdigital/dp-observation-api/models"
 	"github.com/ONSdigital/log.go/v2/log"
@@ -60,6 +60,18 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rewrite only the Self link since all other links come from dataset API and are already rewritten
+	if api.enableURLRewriting {
+		var rewriteErr error
+
+		observationLinksBuilder := links.FromHeadersOrDefault(&r.Header, api.observationAPIURL)
+		observationsDoc.Links.Self.URL, rewriteErr = observationLinksBuilder.BuildLink(observationsDoc.Links.Self.URL)
+		if rewriteErr != nil {
+			handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite self link"), logData)
+			return
+		}
+	}
+
 	// TODO call audit (successful) once it has its own library
 
 	setJSONContentType(w)
@@ -79,7 +91,6 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) doGetObservations(ctx context.Context, datasetID, edition, version string, r *http.Request, logData log.Data) (*models.ObservationsDoc, error) {
-
 	var authorised bool
 	if api.cfg.EnablePrivateEndpoints {
 		authorised = api.checkIfAuthorised(r, logData)
@@ -129,7 +140,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 	}
 
 	// retrieve observations
-	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData, &event, userAuthToken)
+	observations, err := api.getObservationList(ctx, &versionDoc, queryParameters, api.cfg.DefaultObservationLimit, logData, &event)
 	if err != nil {
 		log.Error(ctx, "get observations: unable to retrieve observations", err, logData)
 		return nil, err
@@ -222,10 +233,10 @@ func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, 
 
 // GetListOfValidDimensionNames iterates the provided dimensions and returns an array with their names
 func GetListOfValidDimensionNames(dimensions []dataset.VersionDimension) []string {
-
+	//nolint:prealloc // Consider pre-allocating `dimensionNames`
 	var dimensionNames []string
-	for _, dimension := range dimensions {
-		dimensionNames = append(dimensionNames, dimension.Name)
+	for i := range dimensions {
+		dimensionNames = append(dimensionNames, dimensions[i].Name)
 	}
 
 	return dimensionNames
@@ -263,11 +274,11 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 	}
 
 	if len(incorrectQueryParameters) > 0 {
-		return nil, apierrors.ErrorIncorrectQueryParameters(incorrectQueryParameters)
+		return nil, errs.ErrorIncorrectQueryParameters(incorrectQueryParameters)
 	}
 
 	if len(multivaluedQueryParameters) > 0 {
-		return nil, apierrors.ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
+		return nil, errs.ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
 	}
 
 	// Determine if any dimensions have not been set in request query parameters
@@ -277,7 +288,7 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 				missingQueryParameters = append(missingQueryParameters, validDimension)
 			}
 		}
-		return nil, apierrors.ErrorMissingQueryParameters(missingQueryParameters)
+		return nil, errs.ErrorMissingQueryParameters(missingQueryParameters)
 	}
 
 	return queryParameters, nil
@@ -285,7 +296,6 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 
 // getUserAuthToken obtains the user auth token from the context, expected under FlorenceIdentityKey
 func getUserAuthToken(ctx context.Context) string {
-
 	if request.IsFlorenceIdentityPresent(ctx) {
 		return ctx.Value(request.FlorenceIdentityKey).(string)
 	}
@@ -366,7 +376,7 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 		// from mongo.
 		dimSizes = dimSizes[:0]
 		for i, dimension := range dbFilter.Dimensions {
-			if strings.ToLower(dimension.Name) == "geography" {
+			if strings.EqualFold(dimension.Name, "geography") {
 				d := dim{dimensionSize: 999999, index: i}
 				dimSizes = append(dimSizes, d)
 			} else {
@@ -394,9 +404,9 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 	}
 }
 
-func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data, event *models.FilterSubmitted, userAuthToken string) ([]models.Observation, error) {
-
+func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data, event *models.FilterSubmitted) ([]models.Observation, error) {
 	// Build query (observation.Filter type)
+	//nolint:prealloc // Consider pre-allocating `dimensionFilters`
 	var dimensionFilters []*observation.Dimension
 
 	// Unable to have more than one wildcard parameter per query
@@ -458,7 +468,6 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 	var observations []models.Observation
 	// Iterate over observation row reader
 	for observationRow, err = csvRowReader.Read(); err != io.EOF; observationRow, err = csvRowReader.Read() {
-
 		if err != nil {
 			if strings.Contains(err.Error(), "the filter options created no results") {
 				return nil, errs.ErrObservationsNotFound
@@ -504,16 +513,16 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 	}
 
 	versionDocDimensions := make(map[string]dataset.VersionDimension)
-	for _, dim := range versionDoc.Dimensions {
-		versionDocDimensions[dim.Name] = dim
+	for i := range versionDoc.Dimensions {
+		dim := &versionDoc.Dimensions[i]
+		versionDocDimensions[dim.Name] = *dim
 	}
 
 	if wildcardParameter != "" {
 		dimensions := make(map[string]*models.DimensionObject)
 
 		for i := dimensionOffset + 2; i < len(observationRowArray); i += 2 {
-
-			if strings.ToLower(headerRowArray[i]) == wildcardParameter {
+			if strings.EqualFold(headerRowArray[i], wildcardParameter) {
 				versionDimension, found := versionDocDimensions[wildcardParameter]
 				if found {
 					dimensions[headerRowArray[i]] = &models.DimensionObject{
@@ -531,8 +540,7 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 }
 
 func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err error, data log.Data) {
-
-	_, isObservationErr := err.(apierrors.ObservationQueryError)
+	_, isObservationErr := err.(errs.ObservationQueryError)
 	var status int
 	resErrMsg := err.Error()
 

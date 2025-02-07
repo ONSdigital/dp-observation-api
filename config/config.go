@@ -9,7 +9,7 @@ import (
 // Config represents service configuration for dp-observation-api
 type Config struct {
 	BindAddr                     string        `envconfig:"BIND_ADDR"`
-	HttpWriteTimeout             time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
+	HTTPWriteTimeout             time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
 	CantabularRequestTimeout     time.Duration `envconfig:"CANTABULAR_REQUEST_TIMEOUT"`
 	ServiceAuthToken             string        `envconfig:"SERVICE_AUTH_TOKEN"          json:"-"`
 	DatasetAPIURL                string        `envconfig:"DATASET_API_URL"`
@@ -20,6 +20,7 @@ type Config struct {
 	CantabularHealthcheckEnabled bool          `envconfig:"CANTABULAR_HEALTHCHECK_ENABLED"`
 	DefaultObservationLimit      int           `envconfig:"DEFAULT_OBSERVATION_LIMIT"`
 	EnablePrivateEndpoints       bool          `envconfig:"ENABLE_PRIVATE_ENDPOINTS"`
+	EnableURLRewriting           bool          `envconfig:"ENABLE_URL_REWRITING"`
 	GracefulShutdownTimeout      time.Duration `envconfig:"GRACEFUL_SHUTDOWN_TIMEOUT"`
 	HealthCheckInterval          time.Duration `envconfig:"HEALTHCHECK_INTERVAL"`
 	HealthCheckCriticalTimeout   time.Duration `envconfig:"HEALTHCHECK_CRITICAL_TIMEOUT"`
@@ -36,7 +37,7 @@ func Get() (*Config, error) {
 
 	cfg := &Config{
 		BindAddr:                     ":24500",
-		HttpWriteTimeout:             60 * time.Second,
+		HTTPWriteTimeout:             60 * time.Second,
 		CantabularRequestTimeout:     10 * time.Second,
 		ServiceAuthToken:             "",
 		DatasetAPIURL:                "http://localhost:22000",
@@ -47,6 +48,7 @@ func Get() (*Config, error) {
 		CantabularHealthcheckEnabled: false,
 		DefaultObservationLimit:      10000,
 		EnablePrivateEndpoints:       false,
+		EnableURLRewriting:           false,
 		GracefulShutdownTimeout:      5 * time.Second,
 		HealthCheckInterval:          30 * time.Second,
 		HealthCheckCriticalTimeout:   90 * time.Second,

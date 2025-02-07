@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/dataset"
 	"github.com/ONSdigital/dp-api-clients-go/v2/zebedee"
@@ -37,7 +38,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 
 	// Get HTTP Server
 	r := mux.NewRouter()
-	s := serviceList.GetHTTPServer(cfg.BindAddr, cfg.HttpWriteTimeout, r)
+	s := serviceList.GetHTTPServer(cfg.BindAddr, cfg.HTTPWriteTimeout, r)
 
 	// Get graphDB connection for observation store
 	graphDB, graphErrorConsumer, err := serviceList.GetGraphDB(ctx)
@@ -57,6 +58,16 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	// Get permissions for private endpoints
 	permissions := getAuthorisationHandler(ctx, *cfg)
 
+	// Get EnableURLRewriting feature flag
+	enableURLRewriting := cfg.EnableURLRewriting
+
+	// Get Observation API URL
+	observationAPIURL, err := url.Parse(cfg.ObservationAPIURL)
+	if err != nil {
+		log.Error(ctx, "failed to parse observation api url", err)
+		return nil, err
+	}
+
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
 	if err != nil {
@@ -71,7 +82,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	hc.Start(ctx)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions, enableURLRewriting, observationAPIURL)
 
 	// Run the http server in a new go-routine
 	go func() {
@@ -181,7 +192,6 @@ func registerCheckers(ctx context.Context,
 	datasetAPICli api.IDatasetClient,
 	cantabularClient CantabularClient,
 	enablePrivateEndpoints bool) (err error) {
-
 	hasErrors := false
 
 	if enablePrivateEndpoints {
