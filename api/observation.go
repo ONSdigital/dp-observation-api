@@ -233,10 +233,9 @@ func (api *API) getVersion(ctx context.Context, authorised bool, userAuthToken, 
 
 // GetListOfValidDimensionNames iterates the provided dimensions and returns an array with their names
 func GetListOfValidDimensionNames(dimensions []dataset.VersionDimension) []string {
-	//nolint:prealloc // Consider pre-allocating `dimensionNames`
-	var dimensionNames []string
+	var dimensionNames = make([]string, len(dimensions))
 	for i := range dimensions {
-		dimensionNames = append(dimensionNames, dimensions[i].Name)
+		dimensionNames[i] = dimensions[i].Name
 	}
 
 	return dimensionNames
@@ -406,8 +405,7 @@ var SortFilter = func(ctx context.Context, api *API, event *models.FilterSubmitt
 
 func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Version, queryParameters map[string]string, limit int, logData log.Data, event *models.FilterSubmitted) ([]models.Observation, error) {
 	// Build query (observation.Filter type)
-	//nolint:prealloc // Consider pre-allocating `dimensionFilters`
-	var dimensionFilters []*observation.Dimension
+	var dimensionFilters = make([]*observation.Dimension, 0, len(queryParameters))
 
 	// Unable to have more than one wildcard parameter per query
 	var wildcardParameter string
