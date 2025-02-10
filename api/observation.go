@@ -67,6 +67,7 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		observationLinksBuilder := links.FromHeadersOrDefault(&r.Header, api.observationAPIURL)
 		observationsDoc.Links.Self.URL, rewriteErr = observationLinksBuilder.BuildLink(observationsDoc.Links.Self.URL)
 		if rewriteErr != nil {
+			logData["link"] = observationsDoc.Links.Self.URL
 			handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite self link"), logData)
 			return
 		}
