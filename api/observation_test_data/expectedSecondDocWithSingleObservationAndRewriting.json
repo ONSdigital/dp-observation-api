@@ -2,19 +2,19 @@
 	"dimensions": {
 		"aggregate": {
 			"option": {
-				"href": "http://localhost:8081/code-lists/cpih1dim1aggid/codes/cpi1dim1S40403",
+				"href": "https://api.example.com/v1/code-lists/cpih1dim1aggid/codes/cpi1dim1S40403",
 				"id": "cpi1dim1S40403"
 			}
 		},
 		"geography": {
 			"option": {
-				"href": "http://localhost:8081/code-lists/uk-only/codes/K02000001",
+				"href": "https://api.example.com/v1/code-lists/uk-only/codes/K02000001",
 				"id": "K02000001"
 			}
 		},
 		"time": {
 			"option": {
-				"href": "http://localhost:8081/code-lists/time/codes/16-Aug",
+				"href": "https://api.example.com/v1/code-lists/time/codes/16-Aug",
 				"id": "16-Aug"
 			}
 		}
@@ -22,13 +22,13 @@
 	"limit": 10000,
 	"links": {
 		"dataset_metadata": {
-			"href": "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/metadata"
+			"href": "https://api.example.com/v1/datasets/cpih012/editions/2017/versions/1/metadata"
 		},
 		"self": {
 			"href": "https://api.example.com/v1/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001"
 		},
 		"version": {
-			"href": "http://localhost:8080/datasets/cpih012/editions/2017/versions/1",
+			"href": "https://api.example.com/v1/datasets/cpih012/editions/2017/versions/1",
 			"id": "1"
 		}
 	},
