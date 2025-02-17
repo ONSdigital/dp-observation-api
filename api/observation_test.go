@@ -32,6 +32,7 @@ var (
 	dimension3                   = dataset.VersionDimension{Name: "time"}
 	dimension4                   = dataset.VersionDimension{Name: "age"}
 	observationAPIMockURL        = "http://localhost:8082"
+	datasetAPIMockURL            = "http://localhost:8080"
 	foodObservationResponse      = "146.3,p,2,Month,Aug-16,K02000001,,cpi1dim1G10100,01.1 Food"
 	aggregateObservationResponse = "v4_2,data_marking,confidence_interval,time,time,geography_code,geography,aggregate_code,aggregate"
 )
@@ -112,6 +113,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = observationAPIMockURL
+		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := false
 
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
@@ -228,6 +230,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = observationAPIMockURL
+		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := false
 
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
@@ -317,6 +320,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		cfg.ObservationAPIURL = observationAPIMockURL
+		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := true
 
 		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)

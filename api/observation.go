@@ -60,16 +60,41 @@ func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rewrite only the Self link since all other links come from dataset API and are already rewritten
 	if api.enableURLRewriting {
 		var rewriteErr error
 
+		codeListLinksBuilder := links.FromHeadersOrDefault(&r.Header, api.codeListAPIURL)
+		datasetLinksBuilder := links.FromHeadersOrDefault(&r.Header, api.datasetAPIURL)
 		observationLinksBuilder := links.FromHeadersOrDefault(&r.Header, api.observationAPIURL)
+
+		observationsDoc.Links.DatasetMetadata.URL, rewriteErr = datasetLinksBuilder.BuildLink(observationsDoc.Links.DatasetMetadata.URL)
+		if rewriteErr != nil {
+			logData["link"] = observationsDoc.Links.DatasetMetadata.URL
+			handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite dataset metadata link"), logData)
+			return
+		}
+
 		observationsDoc.Links.Self.URL, rewriteErr = observationLinksBuilder.BuildLink(observationsDoc.Links.Self.URL)
 		if rewriteErr != nil {
 			logData["link"] = observationsDoc.Links.Self.URL
 			handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite self link"), logData)
 			return
+		}
+
+		observationsDoc.Links.Version.URL, rewriteErr = datasetLinksBuilder.BuildLink(observationsDoc.Links.Version.URL)
+		if rewriteErr != nil {
+			logData["link"] = observationsDoc.Links.Version.URL
+			handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite version link"), logData)
+			return
+		}
+
+		for i := range observationsDoc.Dimensions {
+			observationsDoc.Dimensions[i].LinkObject.URL, rewriteErr = codeListLinksBuilder.BuildLink(observationsDoc.Dimensions[i].LinkObject.URL)
+			if rewriteErr != nil {
+				logData["link"] = observationsDoc.Dimensions[i].LinkObject.URL
+				handleObservationsErrorType(ctx, w, errors.WithMessage(rewriteErr, "failed to rewrite dimension link"), logData)
+				return
+			}
 		}
 	}
 
@@ -118,7 +143,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 
 	if versionDoc.Dimensions == nil {
 		logData["version_doc"] = versionDoc
-		log.Error(ctx, "get observations: missing dimensions in versio doc", errs.ErrMissingVersionDimensions, logData)
+		log.Error(ctx, "get observations: missing dimensions in version doc", errs.ErrMissingVersionDimensions, logData)
 		return nil, errs.ErrMissingVersionDimensions
 	}
 
@@ -147,7 +172,7 @@ func (api *API) doGetObservations(ctx context.Context, datasetID, edition, versi
 		return nil, err
 	}
 
-	return models.CreateObservationsDoc(api.cfg.ObservationAPIURL, r.URL.RawQuery, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
+	return models.CreateObservationsDoc(api.cfg.ObservationAPIURL, api.cfg.DatasetAPIURL, r.URL.RawQuery, datasetID, edition, version, &versionDoc, datasetDoc, observations, queryParameters, defaultOffset, api.cfg.DefaultObservationLimit), nil
 }
 
 // GetDimensionOffsetInHeaderRow splits the first item of the provided headers by '_', and returns the second item as integer
