@@ -21,11 +21,13 @@ type API struct {
 	cantabularClient   CantabularClient
 	permissions        IAuthHandler
 	enableURLRewriting bool
+	codeListAPIURL     *url.URL
+	datasetAPIURL      *url.URL
 	observationAPIURL  *url.URL
 }
 
 // Setup creates the API struct and its endpoints with corresponding handlers
-func Setup(_ context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, cantabularClient CantabularClient, permissions IAuthHandler, enableURLRewriting bool, observationAPIURL *url.URL) *API {
+func Setup(_ context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph, datasetClient IDatasetClient, cantabularClient CantabularClient, permissions IAuthHandler, enableURLRewriting bool, codeListAPIURL, datasetAPIURL, observationAPIURL *url.URL) *API {
 	api := &API{
 		cfg:                cfg,
 		Router:             r,
@@ -34,6 +36,8 @@ func Setup(_ context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph,
 		cantabularClient:   cantabularClient,
 		permissions:        permissions,
 		enableURLRewriting: enableURLRewriting,
+		codeListAPIURL:     codeListAPIURL,
+		datasetAPIURL:      datasetAPIURL,
 		observationAPIURL:  observationAPIURL,
 	}
 

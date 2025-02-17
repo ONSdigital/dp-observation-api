@@ -61,6 +61,20 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	// Get EnableURLRewriting feature flag
 	enableURLRewriting := cfg.EnableURLRewriting
 
+	// Get CodeList API URL
+	codeListAPIURL, err := url.Parse(cfg.CodeListAPIURL)
+	if err != nil {
+		log.Error(ctx, "failed to parse code list api url", err)
+		return nil, err
+	}
+
+	// Get Dataset API URL
+	datasetAPIURL, err := url.Parse(cfg.DatasetAPIURL)
+	if err != nil {
+		log.Error(ctx, "failed to parse dataset api url", err)
+		return nil, err
+	}
+
 	// Get Observation API URL
 	observationAPIURL, err := url.Parse(cfg.ObservationAPIURL)
 	if err != nil {
@@ -82,7 +96,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	hc.Start(ctx)
 
 	// Setup the API
-	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions, enableURLRewriting, observationAPIURL)
+	a := api.Setup(ctx, r, cfg, graphDB, datasetAPICli, cantabularClient, permissions, enableURLRewriting, codeListAPIURL, datasetAPIURL, observationAPIURL)
 
 	// Run the http server in a new go-routine
 	go func() {

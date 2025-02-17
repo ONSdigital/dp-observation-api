@@ -25,6 +25,7 @@ func TestConfig(t *testing.T) {
 					HTTPWriteTimeout:           60 * time.Second,
 					CantabularRequestTimeout:   10 * time.Second,
 					ServiceAuthToken:           "",
+					CodeListAPIURL:             "http://localhost:22400",
 					DatasetAPIURL:              "http://localhost:22000",
 					ObservationAPIURL:          "http://localhost:24500",
 					ZebedeeURL:                 "http://localhost:8082",

@@ -29,6 +29,8 @@ var ctx = context.WithValue(context.Background(), request.FlorenceIdentityKey, t
 var (
 	mu                sync.Mutex
 	testContext       = context.Background()
+	codeListAPIURL    = &url.URL{Scheme: "http", Host: "localhost:22400"}
+	datasetAPIURL     = &url.URL{Scheme: "http", Host: "localhost:22000"}
 	observationAPIURL = &url.URL{Scheme: "http", Host: "localhost:24500"}
 )
 
@@ -100,7 +102,7 @@ func GetAPIWithMocks(cfg *config.Config, graphDBMock api.IGraph, dcMock api.IDat
 	mu.Lock()
 	defer mu.Unlock()
 	cfg.ServiceAuthToken = testServiceAuthToken
-	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting, observationAPIURL)
+	return api.Setup(testContext, mux.NewRouter(), cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting, codeListAPIURL, datasetAPIURL, observationAPIURL)
 }
 
 func assertInternalServerErr(w *httptest.ResponseRecorder) {

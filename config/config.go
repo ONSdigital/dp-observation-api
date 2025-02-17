@@ -12,6 +12,7 @@ type Config struct {
 	HTTPWriteTimeout             time.Duration `envconfig:"HTTP_WRITE_TIMEOUT"`
 	CantabularRequestTimeout     time.Duration `envconfig:"CANTABULAR_REQUEST_TIMEOUT"`
 	ServiceAuthToken             string        `envconfig:"SERVICE_AUTH_TOKEN"          json:"-"`
+	CodeListAPIURL               string        `envconfig:"CODE_LIST_API_URL"`
 	DatasetAPIURL                string        `envconfig:"DATASET_API_URL"`
 	ObservationAPIURL            string        `envconfig:"OBSERVATION_API_URL"`
 	ZebedeeURL                   string        `envconfig:"ZEBEDEE_URL"`
@@ -40,6 +41,7 @@ func Get() (*Config, error) {
 		HTTPWriteTimeout:             60 * time.Second,
 		CantabularRequestTimeout:     10 * time.Second,
 		ServiceAuthToken:             "",
+		CodeListAPIURL:               "http://localhost:22400",
 		DatasetAPIURL:                "http://localhost:22000",
 		ObservationAPIURL:            "http://localhost:24500",
 		ZebedeeURL:                   "http://localhost:8082",
