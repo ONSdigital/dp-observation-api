@@ -54,22 +54,20 @@ type FilterSubmitted struct {
 }
 
 // CreateObservationsDoc manages the creation of metadata across dataset and version docs
-func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Version, datasetDetails dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
-	selfLink := generateSelfURL(obsAPIURL, rawQuery, versionDoc)
+func CreateObservationsDoc(obsAPIURL, datasetAPIURL, rawQuery, datasetID, edition, version string, versionDoc *dataset.Version, datasetDetails dataset.DatasetDetails, observations []Observation, queryParameters map[string]string, offset, limit int) *ObservationsDoc {
+	selfLink := generateSelfURL(obsAPIURL, rawQuery, datasetID, edition, version)
+	versionLink := generateVersionLink(datasetAPIURL, datasetID, edition, version)
 
 	observationsDoc := &ObservationsDoc{
 		Limit: limit,
 		Links: &ObservationLinks{
 			DatasetMetadata: &dataset.Link{
-				URL: versionDoc.Links.Version.URL + "/metadata",
+				URL: versionLink.URL + "/metadata",
 			},
 			Self: &dataset.Link{
 				URL: selfLink,
 			},
-			Version: &dataset.Link{
-				URL: versionDoc.Links.Version.URL,
-				ID:  versionDoc.Links.Version.ID,
-			},
+			Version: versionLink,
 		},
 		Observations:      observations,
 		Offset:            offset,
@@ -105,7 +103,14 @@ func CreateObservationsDoc(obsAPIURL, rawQuery string, versionDoc *dataset.Versi
 	return observationsDoc
 }
 
-func generateSelfURL(obsAPIURL, rawQuery string, versionDoc *dataset.Version) string {
-	return obsAPIURL + "/datasets/" + versionDoc.Links.Dataset.ID + "/editions/" +
-		versionDoc.Links.Edition.ID + "/versions/" + versionDoc.Links.Version.ID + "/observations?" + rawQuery
+func generateSelfURL(obsAPIURL, rawQuery, datasetID, edition, version string) string {
+	return obsAPIURL + "/datasets/" + datasetID + "/editions/" +
+		edition + "/versions/" + version + "/observations?" + rawQuery
+}
+
+func generateVersionLink(datasetAPIURL, datasetID, edition, version string) *dataset.Link {
+	return &dataset.Link{
+		URL: datasetAPIURL + "/datasets/" + datasetID + "/editions/" + edition + "/versions/" + version,
+		ID:  version,
+	}
 }
