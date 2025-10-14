@@ -13,7 +13,7 @@ all: audit test build
 
 .PHONY: audit
 audit:
-	go list -m all | nancy sleuth
+	dis-vulncheck
 
 .PHONY: build
 build:
