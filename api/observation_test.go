@@ -59,9 +59,10 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		mockRowReader := &observationtest.StreamRowReaderMock{
 			ReadFunc: func() (string, error) {
 				count++
-				if count == 1 {
+				switch count {
+				case 1:
 					return aggregateObservationResponse, nil
-				} else if count == 2 {
+				case 2:
 					return foodObservationResponse, nil
 				}
 				return "", io.EOF
@@ -116,13 +117,13 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
-			ap.Router.ServeHTTP(w, r)
+			observationAPI.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithSingleObservation"))
@@ -137,7 +138,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			r := httptest.NewRequest("GET", "http://localhost:8080/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&AggregaTe=cpi1dim1S40403&GEOGRAPHY=K02000001", http.NoBody)
 			r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
 			w := httptest.NewRecorder()
-			ap.Router.ServeHTTP(w, r)
+			observationAPI.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedSecondDocWithSingleObservation"))
@@ -174,11 +175,12 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		mockRowReader := &observationtest.StreamRowReaderMock{
 			ReadFunc: func() (string, error) {
 				count++
-				if count == 1 {
+				switch count {
+				case 1:
 					return aggregateObservationResponse, nil
-				} else if count == 2 {
+				case 2:
 					return foodObservationResponse, nil
-				} else if count == 3 {
+				case 3:
 					return "112.1,,,Month,Aug-16,K02000001,,cpi1dim1G10101,01.2 Waste", nil
 				}
 				return "", io.EOF
@@ -233,8 +235,8 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		ap.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusOK)
 		So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithMultipleObservations"))
@@ -266,9 +268,10 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		mockRowReader := &observationtest.StreamRowReaderMock{
 			ReadFunc: func() (string, error) {
 				count++
-				if count == 1 {
+				switch count {
+				case 1:
 					return aggregateObservationResponse, nil
-				} else if count == 2 {
+				case 2:
 					return foodObservationResponse, nil
 				}
 				return "", io.EOF
@@ -323,7 +326,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 		cfg.DatasetAPIURL = datasetAPIMockURL
 		enableURLRewriting := true
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When request contains query parameters where the dimension name is in lower casing", func() {
 			r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
@@ -332,7 +335,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			r.Header.Add("X-Forwarded-Host", "api.example.com")
 			r.Header.Add("X-Forwarded-Path-Prefix", "v1")
 			w := httptest.NewRecorder()
-			ap.Router.ServeHTTP(w, r)
+			observationAPI.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedDocWithSingleObservationAndRewriting"))
@@ -350,7 +353,7 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 			r.Header.Add("X-Forwarded-Host", "api.example.com")
 			r.Header.Add("X-Forwarded-Path-Prefix", "v1")
 			w := httptest.NewRecorder()
-			ap.Router.ServeHTTP(w, r)
+			observationAPI.Router.ServeHTTP(w, r)
 
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.String(), ShouldContainSubstring, getTestData(ctx, "expectedSecondDocWithSingleObservationAndRewriting"))
@@ -381,8 +384,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		So(w.Body.String(), ShouldResemble, "internal error\n")
@@ -407,8 +410,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
@@ -436,8 +439,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrVersionNotFound.Error())
@@ -463,8 +466,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrDatasetNotFound.Error())
@@ -492,8 +495,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrVersionNotFound.Error())
@@ -532,8 +535,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		cfg.EnablePrivateEndpoints = true
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, pMock, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, pMock, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
 		validateGetDataset(dcMock, "cpih012")
@@ -585,8 +588,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		ap.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
@@ -617,8 +620,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusInternalServerError)
 
@@ -672,8 +675,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		ap.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		assertInternalServerErr(w)
 		validateGetDataset(dcMock, "cpih012")
@@ -704,8 +707,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "incorrect selection of query parameters: [geography], these dimensions do not exist for this version of the dataset\n")
@@ -737,8 +740,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "missing query parameters for the following dimensions: [age]\n")
@@ -771,8 +774,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "only one wildcard (*) is allowed as a value in selected query parameters\n")
@@ -817,8 +820,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		ap.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusNotFound)
 		So(w.Body.String(), ShouldContainSubstring, errs.ErrObservationsNotFound.Error())
@@ -876,8 +879,8 @@ func TestGetObservationsReturnsError(t *testing.T) {
 		So(err, ShouldBeNil)
 		enableURLRewriting := false
 
-		api := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
-		api.Router.ServeHTTP(w, r)
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
 
 		So(w.Code, ShouldEqual, http.StatusBadRequest)
 		So(w.Body.String(), ShouldResemble, "multi-valued query parameters for the following dimensions: [geography]\n")
@@ -1163,10 +1166,10 @@ func TestSortFilter(t *testing.T) {
 		cfg.ObservationAPIURL = observationAPIMockURL
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
+			api.SortFilter(ctx, observationAPI, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension sees no change", func() {
 				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 0)
@@ -1208,10 +1211,10 @@ func TestSortFilter(t *testing.T) {
 		cfg.ObservationAPIURL = observationAPIMockURL
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
+			api.SortFilter(ctx, observationAPI, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension order puts 'geogrphy' first and the rest retain their order", func() {
 				// NOTE: As we are simulating mongo errors, depending on how fast the loop in SortFilter
@@ -1269,10 +1272,10 @@ func TestSortFilter(t *testing.T) {
 		cfg.ObservationAPIURL = observationAPIMockURL
 		enableURLRewriting := false
 
-		ap := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
 
 		Convey("When SortFilter is called", func() {
-			api.SortFilter(ctx, ap, &eventFilterSubmitted, &dbFilter)
+			api.SortFilter(ctx, observationAPI, &eventFilterSubmitted, &dbFilter)
 
 			Convey("The dimension order is returned by largest dimension first to smallest last order", func() {
 				So(len(dcMock.GetOptionsCalls()), ShouldEqual, 3)

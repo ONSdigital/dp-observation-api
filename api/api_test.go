@@ -43,10 +43,10 @@ func TestSetup(t *testing.T) {
 		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
 		enableURLRewriting := false
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
-			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
+			So(hasRoute(observationAPI.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
 		})
 	})
 
@@ -64,10 +64,10 @@ func TestSetup(t *testing.T) {
 			},
 		}
 		enableURLRewriting := false
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
-			So(hasRoute(api.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
+			So(hasRoute(observationAPI.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
 		})
 	})
 }
@@ -81,10 +81,10 @@ func TestClose(t *testing.T) {
 		cMock := &mock.CantabularClientMock{}
 		pMock := &auth.NopHandler{}
 		enableURLRewriting := false
-		api := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
+		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When the api is closed any dependencies are closed also", func() {
-			err := api.Close(testContext)
+			err := observationAPI.Close(testContext)
 			So(err, ShouldBeNil)
 			// Check that dependencies are closed here
 		})

@@ -521,7 +521,7 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 }
 
 func createObservation(versionDoc *dataset.Version, observationRowArray, headerRowArray []string, dimensionOffset int, wildcardParameter string) models.Observation {
-	observation := models.Observation{
+	result := models.Observation{
 		Observation: observationRowArray[0],
 	}
 
@@ -533,7 +533,7 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 			observationMetaData[headerRowArray[i]] = observationRowArray[i]
 		}
 
-		observation.Metadata = observationMetaData
+		result.Metadata = observationMetaData
 	}
 
 	versionDocDimensions := make(map[string]dataset.VersionDimension)
@@ -558,9 +558,9 @@ func createObservation(versionDoc *dataset.Version, observationRowArray, headerR
 				break
 			}
 		}
-		observation.Dimensions = dimensions
+		result.Dimensions = dimensions
 	}
-	return observation
+	return result
 }
 
 func handleObservationsErrorType(ctx context.Context, w http.ResponseWriter, err error, data log.Data) {
