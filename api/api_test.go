@@ -46,7 +46,7 @@ func TestSetup(t *testing.T) {
 		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
-			So(hasRoute(observationAPI.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
+			So(hasRoute(observationAPI.Router, "/datasets/test-dataset/editions/2024/versions/1/observations", "GET"), ShouldBeTrue)
 		})
 	})
 
@@ -67,7 +67,7 @@ func TestSetup(t *testing.T) {
 		observationAPI := GetAPIWithMocks(cfg, graphDBMock, dcMock, cMock, pMock, enableURLRewriting)
 
 		Convey("When created the following routes should have been added", func() {
-			So(hasRoute(observationAPI.Router, "/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", "GET"), ShouldBeTrue)
+			So(hasRoute(observationAPI.Router, "/datasets/test-dataset/editions/2024/versions/1/observations", "GET"), ShouldBeTrue)
 		})
 	})
 }

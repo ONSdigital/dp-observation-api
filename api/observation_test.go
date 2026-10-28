@@ -367,6 +367,52 @@ func TestGetObservationsReturnsOK(t *testing.T) {
 }
 
 func TestGetObservationsReturnsError(t *testing.T) {
+	Convey("When request contains a dataset-id with invalid characters", t, func() {
+		r := httptest.NewRequest("GET", "http://localhost:8082/datasets/!123@@/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
+		w := httptest.NewRecorder()
+
+		dcMock := &mock.IDatasetClientMock{}
+
+		graphDBMock := &mock.IGraphMock{}
+
+		cMock := &mock.CantabularClientMock{}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		enableURLRewriting := false
+
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
+
+		So(w.Code, ShouldEqual, http.StatusNotFound)
+
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 0)
+	})
+
+	Convey("When request contains an edition with invalid characters", t, func() {
+		r := httptest.NewRequest("GET", "http://localhost:8082/datasets/cpih012/editions/!...()something/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
+		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
+		w := httptest.NewRecorder()
+
+		dcMock := &mock.IDatasetClientMock{}
+
+		graphDBMock := &mock.IGraphMock{}
+
+		cMock := &mock.CantabularClientMock{}
+
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		enableURLRewriting := false
+
+		observationAPI := GetAPIWithMocks(cfg, &mock.IGraphMock{}, dcMock, cMock, &auth.NopHandler{}, enableURLRewriting)
+		observationAPI.Router.ServeHTTP(w, r)
+
+		So(w.Code, ShouldEqual, http.StatusNotFound)
+
+		So(len(graphDBMock.StreamCSVRowsCalls()), ShouldEqual, 0)
+	})
+
 	Convey("When the api cannot connect to dataset api return an internal server error", t, func() {
 		r := httptest.NewRequest("GET", "http://localhost:22000/datasets/cpih012/editions/2017/versions/1/observations?time=16-Aug&aggregate=cpi1dim1S40403&geography=K02000001", http.NoBody)
 		r = r.WithContext(context.WithValue(r.Context(), request.FlorenceIdentityKey, testUserAuthToken))
@@ -1033,6 +1079,21 @@ func TestExtractQueryParameters(t *testing.T) {
 				So(queryParameters["time"], ShouldEqual, "JAN08")
 				So(queryParameters["aggregate"], ShouldEqual, "Overall Index")
 				So(queryParameters["geography"], ShouldEqual, "wales")
+			})
+		})
+
+		Convey("When a request is made containing query parameters for each dimension/heade, but an option has invalid characters", func() {
+			r, err := http.NewRequest("GET",
+				"http://localhost:22000/datasets/123/editions/2017/versions/1/observations?time=JAN08&aggregate=Overall!!!!!Index&geography=wales",
+				http.NoBody,
+			)
+			So(err, ShouldBeNil)
+
+			Convey("Then extractQueryParameters func returns a list of query parameters and their corresponding value", func() {
+				queryParameters, err := api.ExtractQueryParameters(r.URL.Query(), headers)
+				So(err, ShouldNotBeNil)
+				So(err, ShouldResemble, errs.ErrorInvalidQueryParameters([]string{"aggregate"}))
+				So(queryParameters, ShouldBeNil)
 			})
 		})
 

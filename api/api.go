@@ -43,9 +43,9 @@ func Setup(_ context.Context, r *mux.Router, cfg *config.Config, graphDB IGraph,
 
 	if api.cfg.EnablePrivateEndpoints {
 		read := auth.Permissions{Read: true}
-		r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", permissions.Require(read, api.getObservations)).Methods(http.MethodGet)
+		r.HandleFunc("/datasets/{dataset_id:[A-Za-z0-9_-]+}/editions/{edition:[A-Za-z0-9_-]+}/versions/{version}/observations", permissions.Require(read, api.getObservations)).Methods(http.MethodGet)
 	} else {
-		r.HandleFunc("/datasets/{dataset_id}/editions/{edition}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
+		r.HandleFunc("/datasets/{dataset_id:[A-Za-z0-9_-]+}/editions/{edition:[A-Za-z0-9_-]+}/versions/{version}/observations", api.getObservations).Methods(http.MethodGet)
 	}
 
 	return api

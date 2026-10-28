@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +43,8 @@ var (
 		errs.ErrTooManyWildcards: true,
 	}
 )
+
+var validOptionPattern = regexp.MustCompile(`^[A-Za-z0-9_ -]+$`)
 
 func (api *API) getObservations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -270,7 +273,7 @@ func GetListOfValidDimensionNames(dimensions []dataset.VersionDimension) []strin
 // ExtractQueryParameters creates a map of query parameters (options) by dimension from the provided urlQuery if they exist in the validDimensions list
 func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[string]string, error) {
 	queryParameters := make(map[string]string)
-	var incorrectQueryParameters, missingQueryParameters, multivaluedQueryParameters []string
+	var incorrectQueryParameters, missingQueryParameters, multivaluedQueryParameters, invalidQueryParameters []string
 
 	// Map for efficiency
 	validDimensionsMap := make(map[string]struct{})
@@ -288,6 +291,10 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 
 		if _, dimFound := validDimensionsMap[dimension]; dimFound {
 			queryParamExists = true
+			if len(option) == 0 || option[0] != "*" && !validOptionPattern.MatchString(option[0]) {
+				invalidQueryParameters = append(invalidQueryParameters, rawDimension)
+				continue
+			}
 			queryParameters[dimension] = option[0]
 			if len(option) != 1 {
 				multivaluedQueryParameters = append(multivaluedQueryParameters, rawDimension)
@@ -304,6 +311,10 @@ func ExtractQueryParameters(urlQuery url.Values, validDimensions []string) (map[
 
 	if len(multivaluedQueryParameters) > 0 {
 		return nil, errs.ErrorMultivaluedQueryParameters(multivaluedQueryParameters)
+	}
+
+	if len(invalidQueryParameters) > 0 {
+		return nil, errs.ErrorInvalidQueryParameters(invalidQueryParameters)
 	}
 
 	// Determine if any dimensions have not been set in request query parameters
@@ -516,7 +527,6 @@ func (api *API) getObservationList(ctx context.Context, versionDoc *dataset.Vers
 	// order as it is deterministic for static data, but this does not
 	// necessarily mean we won't want to return observations in a particular
 	// order (which may be costly on the services performance)
-
 	return observations, nil
 }
 

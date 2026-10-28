@@ -50,3 +50,10 @@ func ErrorMultivaluedQueryParameters(params []string) error {
 		message: fmt.Sprintf("multi-valued query parameters for the following dimensions: %v", params),
 	}
 }
+
+// ErrorInvalidQueryParameters returns an error for query parameters with invalid characters
+func ErrorInvalidQueryParameters(params []string) error {
+	return ObservationQueryError{
+		message: fmt.Sprintf("invalid selection of query parameters: %v, these options do not exist for this version of the dataset", params),
+	}
+}
